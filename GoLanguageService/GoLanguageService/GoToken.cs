@@ -9,12 +9,10 @@ namespace Fitbos.GoLanguageService
 {
 	public class GoToken
 	{
-		public int ID { get; set; }
+		public int Position;
 
-		public TokenType Type { get; set; }
+		public GoTokenID ID;
 
-		public int StartIndex { get; set; }
-
-		public string Text { get; set; }
+		public string Text;
 	}
 }

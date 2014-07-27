@@ -128,10 +128,14 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="GoAuthoringScope.cs" />
+    <Compile Include="GoColorizer.cs" />
     <Compile Include="GoHelper.cs" />
     <Compile Include="GoLanguageService.cs" />
+    <Compile Include="GoLexer.cs" />
     <Compile Include="GoScanner.cs" />
+    <Compile Include="GoSource.cs" />
     <Compile Include="GoToken.cs" />
+    <Compile Include="GoTokenID.cs" />
     <Compile Include="Guids.cs" />
     <Compile Include="Resources.Designer.cs">
       <AutoGen>True</AutoGen>

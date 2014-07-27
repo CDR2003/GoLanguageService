@@ -14,6 +14,8 @@ namespace Fitbos.GoLanguageService
 
 		private GoScanner m_scanner;
 
+		private GoColorizer m_colorizer;
+
 		public override string GetFormatFilterList()
 		{
 			return "Go files (*.go)\n*.go\n";
@@ -34,6 +36,7 @@ namespace Fitbos.GoLanguageService
 			if( m_scanner == null )
 			{
 				m_scanner = new GoScanner();
+				m_colorizer = new GoColorizer( this, buffer, m_scanner );
 			}
 			return m_scanner;
 		}
@@ -46,6 +49,11 @@ namespace Fitbos.GoLanguageService
 		public override AuthoringScope ParseSource( ParseRequest req )
 		{
 			return new GoAuthoringScope();
+		}
+
+		public override Source CreateSource( IVsTextLines buffer )
+		{
+			return new GoSource( this, buffer, m_colorizer );
 		}
 	}
 }

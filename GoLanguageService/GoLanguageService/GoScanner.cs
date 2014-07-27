@@ -38,14 +38,6 @@ namespace Fitbos.GoLanguageService
 				return false;
 			}
 
-			var token = m_tokens[m_currentIndex];
-			tokenInfo.Type = token.Type;
-			tokenInfo.Color = GetColor( tokenInfo.Type );
-			tokenInfo.StartIndex = token.StartIndex;
-			tokenInfo.EndIndex = tokenInfo.StartIndex + token.Text.Length - 1;
-			tokenInfo.Token = token.ID;
-			tokenInfo.Trigger = GetTriggers( tokenInfo.Token );
-
 			m_currentIndex++;
 			return true;
 		}
@@ -91,6 +83,29 @@ namespace Fitbos.GoLanguageService
 
 		private static TokenTriggers GetTriggers( int tokenID )
 		{
+			var result = TokenTriggers.None;
+			switch( (GoTokenID)tokenID )
+			{
+				case GoTokenID.PERIOD:
+					result |= TokenTriggers.MemberSelect;
+					break;
+				case GoTokenID.LBRACK:
+				case GoTokenID.LBRACE:
+				case GoTokenID.RBRACK:
+				case GoTokenID.RBRACE:
+					result |= TokenTriggers.MatchBraces;
+					break;
+				case GoTokenID.LPAREN:
+					result |= TokenTriggers.MatchBraces;
+					result |= TokenTriggers.ParameterStart;
+					break;
+				case GoTokenID.COMMA:
+					return TokenTriggers.ParameterNext;
+				case GoTokenID.RPAREN:
+					result |= TokenTriggers.MatchBraces;
+					result |= TokenTriggers.ParameterEnd;
+					break;
+			}
 			return TokenTriggers.None;
 		}
 	}

@@ -39,7 +39,7 @@ func main() {
 			tok.Type = "Keyword"
 		} else if tokenID == token.SEMICOLON {
 			tok.Type = "Delimiter"
-		} else if tokenID == token.STRING {
+		} else if tokenID == token.STRING || tokenID == token.CHAR {
 			tok.Type = "String"
 		} else if tokenID.IsLiteral() {
 			tok.Type = "Literal"
