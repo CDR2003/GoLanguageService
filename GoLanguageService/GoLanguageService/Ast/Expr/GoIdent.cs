@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Fitbos.GoLanguageService.Ast
 {
-	public class GoIdent : GoNode
+	public class GoIdent : GoExpr
 	{
 		public int NamePos { get; set; }
 

@@ -41,18 +41,18 @@ namespace Fitbos.GoLanguageService.Ast
 						}
 					}
 				}
-				else if( type == typeof( GoImport ) )
+				else if( type == typeof( GoImportSpec ) )
 				{
-					var d = this.Declaration as GoImport;
+					var d = this.Declaration as GoImportSpec;
 					if( d.Name != null && d.Name.Name == name )
 					{
 						return d.Name.Pos;
 					}
 					return d.Path.Pos;
 				}
-				else if( type == typeof( GoValue ) )
+				else if( type == typeof( GoValueSpec ) )
 				{
-					var d = this.Declaration as GoValue;
+					var d = this.Declaration as GoValueSpec;
 					foreach( var n in d.Names )
 					{
 						if( n.Name == name )
@@ -61,33 +61,33 @@ namespace Fitbos.GoLanguageService.Ast
 						}
 					}
 				}
-				else if( type == typeof( GoType ) )
+				else if( type == typeof( GoTypeSpec ) )
 				{
-					var d = this.Declaration as GoType;
+					var d = this.Declaration as GoTypeSpec;
 					if( d.Name.Name == name )
 					{
 						return d.Name.Pos;
 					}
 				}
-				else if( type == typeof( GoFunctionDeclaration ) )
+				else if( type == typeof( GoFuncDecl ) )
 				{
-					var d = this.Declaration as GoFunctionDeclaration;
+					var d = this.Declaration as GoFuncDecl;
 					if( d.Name.Name == name )
 					{
 						return d.Name.Pos;
 					}
 				}
-				else if( type == typeof( GoLabeledStatement ) )
+				else if( type == typeof( GoLabeledStmt ) )
 				{
-					var d = this.Declaration as GoLabeledStatement;
+					var d = this.Declaration as GoLabeledStmt;
 					if( d.Label.Name == name )
 					{
 						return d.Label.Pos;
 					}
 				}
-				else if( type == typeof( GoAssignStatement ) )
+				else if( type == typeof( GoAssignStmt ) )
 				{
-					var d = this.Declaration as GoAssignStatement;
+					var d = this.Declaration as GoAssignStmt;
 					foreach( var x in d.Lhs )
 					{
 						var ident = x as GoIdent;

@@ -150,7 +150,7 @@
     <Compile Include="Ast\Expr\GoMapType.cs" />
     <Compile Include="Ast\GoNode.cs" />
     <Compile Include="Ast\Expr\GoIdent.cs" />
-    <Compile Include="Ast\GoImport.cs" />
+    <Compile Include="Ast\Spec\GoImportSpec.cs" />
     <Compile Include="Ast\GoObject.cs" />
     <Compile Include="Ast\GoObjectKind.cs" />
     <Compile Include="Ast\Expr\GoParenExpr.cs" />
@@ -158,6 +158,9 @@
     <Compile Include="Ast\Expr\GoSelectorExpr.cs" />
     <Compile Include="Ast\Expr\GoSliceExpr.cs" />
     <Compile Include="Ast\Expr\GoStarExpr.cs" />
+    <Compile Include="Ast\Spec\GoSpec.cs" />
+    <Compile Include="Ast\Spec\GoTypeSpec.cs" />
+    <Compile Include="Ast\Spec\GoValueSpec.cs" />
     <Compile Include="Ast\Stmt\GoAssignStmt.cs" />
     <Compile Include="Ast\Stmt\GoBlockStmt.cs" />
     <Compile Include="Ast\Stmt\GoBranchStmt.cs" />

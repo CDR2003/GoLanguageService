@@ -18,7 +18,7 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public GoScope Scope { get; set; }
 
-		public List<GoImport> Imports { get; set; }
+		public List<GoImportSpec> Imports { get; set; }
 
 		public List<GoIdent> Unresolved { get; set; }
 
