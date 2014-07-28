@@ -26,7 +26,7 @@ namespace Fitbos.GoLanguageService.Ast
 			return char.IsUpper( name[0] );
 		}
 
-		public bool IsExported
+		public bool Exported
 		{
 			get
 			{

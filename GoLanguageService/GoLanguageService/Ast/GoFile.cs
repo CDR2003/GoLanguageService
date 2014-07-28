@@ -14,7 +14,7 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public GoIdent Name { get; set; }
 
-		public List<GoDeclaration> Declarations { get; set; }
+		public List<GoDecl> Declarations { get; set; }
 
 		public GoScope Scope { get; set; }
 

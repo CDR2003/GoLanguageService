@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Fitbos.GoLanguageService.Ast
 {
-	public abstract class GoDeclaration : GoNode
+	public abstract class GoDecl : GoNode
 	{
 	}
 }
