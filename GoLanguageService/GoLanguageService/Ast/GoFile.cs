@@ -14,7 +14,7 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public GoIdent Name { get; set; }
 
-		public List<GoDecl> Declarations { get; set; }
+		public List<GoDecl> Decls { get; set; }
 
 		public GoScope Scope { get; set; }
 
@@ -36,9 +36,9 @@ namespace Fitbos.GoLanguageService.Ast
 		{
 			get
 			{
-				if( this.Declarations.Count > 0 )
+				if( this.Decls.Count > 0 )
 				{
-					return this.Declarations.Last().End;
+					return this.Decls.Last().End;
 				}
 				return this.Name.End;
 			}

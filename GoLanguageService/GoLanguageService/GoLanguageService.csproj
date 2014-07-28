@@ -127,6 +127,9 @@
     </COMReference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Ast\Decl\GoBadDecl.cs" />
+    <Compile Include="Ast\Decl\GoFuncDecl.cs" />
+    <Compile Include="Ast\Decl\GoGenDecl.cs" />
     <Compile Include="Ast\Expr\GoArrayType.cs" />
     <Compile Include="Ast\Expr\GoBadExpr.cs" />
     <Compile Include="Ast\Expr\GoBasicLit.cs" />
@@ -136,7 +139,7 @@
     <Compile Include="Ast\GoComment.cs" />
     <Compile Include="Ast\GoCommentGroup.cs" />
     <Compile Include="Ast\Expr\GoCompositeLit.cs" />
-    <Compile Include="Ast\GoDecl.cs" />
+    <Compile Include="Ast\Decl\GoDecl.cs" />
     <Compile Include="Ast\Expr\GoEllipsis.cs" />
     <Compile Include="Ast\Expr\GoExpr.cs" />
     <Compile Include="Ast\GoField.cs" />
@@ -150,6 +153,7 @@
     <Compile Include="Ast\Expr\GoMapType.cs" />
     <Compile Include="Ast\GoNode.cs" />
     <Compile Include="Ast\Expr\GoIdent.cs" />
+    <Compile Include="Ast\GoPackage.cs" />
     <Compile Include="Ast\Spec\GoImportSpec.cs" />
     <Compile Include="Ast\GoObject.cs" />
     <Compile Include="Ast\GoObjectKind.cs" />
