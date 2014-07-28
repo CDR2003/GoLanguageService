@@ -16,6 +16,8 @@ namespace Fitbos.GoLanguageService
 
 		private GoColorizer m_colorizer;
 
+		private GoSource m_source;
+
 		public override string GetFormatFilterList()
 		{
 			return "Go files (*.go)\n*.go\n";
@@ -26,6 +28,11 @@ namespace Fitbos.GoLanguageService
 			if( m_preferences == null )
 			{
 				m_preferences = new LanguagePreferences( this.Site, typeof( GoLanguageService ).GUID, this.Name );
+				m_preferences.EnableCodeSense = true;
+				m_preferences.EnableCommenting = true;
+				m_preferences.EnableMatchBraces = true;
+				m_preferences.EnableMatchBracesAtCaret = true;
+				m_preferences.EnableShowMatchingBrace = true;
 				m_preferences.Init();
 			}
 			return m_preferences;
@@ -48,12 +55,31 @@ namespace Fitbos.GoLanguageService
 
 		public override AuthoringScope ParseSource( ParseRequest req )
 		{
+			var lexer = new GoLexer();
+			lexer.SetSource( req.Text, 0 );
+
+			int state = 0;
+			var tokens = new List<GoToken>();
+			for(;;)
+			{
+				var token = lexer.GetToken( ref state );
+				if( token.ID == GoTokenID.EOF )
+				{
+					break;
+				}
+
+				tokens.Add( token );
+			}
 			return new GoAuthoringScope();
 		}
 
 		public override Source CreateSource( IVsTextLines buffer )
 		{
-			return new GoSource( this, buffer, m_colorizer );
+			if( m_source == null )
+			{
+				m_source = new GoSource( this, buffer, m_colorizer );
+			}
+			return m_source;
 		}
 	}
 }

@@ -119,16 +119,19 @@ namespace Fitbos.GoLanguageService
 				case GoTokenID.RBRACK:
 				case GoTokenID.RBRACE:
 					result |= TokenTriggers.MatchBraces;
+					result |= TokenTriggers.MemberSelect;
 					break;
 				case GoTokenID.LPAREN:
 					result |= TokenTriggers.MatchBraces;
 					result |= TokenTriggers.ParameterStart;
+					result |= TokenTriggers.MemberSelect;
 					break;
 				case GoTokenID.COMMA:
 					return TokenTriggers.ParameterNext;
 				case GoTokenID.RPAREN:
 					result |= TokenTriggers.MatchBraces;
 					result |= TokenTriggers.ParameterEnd;
+					result |= TokenTriggers.MemberSelect;
 					break;
 			}
 			return TokenTriggers.None;

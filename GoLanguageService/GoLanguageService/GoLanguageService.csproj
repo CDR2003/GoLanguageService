@@ -127,11 +127,26 @@
     </COMReference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Ast\GoComment.cs" />
+    <Compile Include="Ast\GoCommentGroup.cs" />
+    <Compile Include="Ast\GoDeclaration.cs" />
+    <Compile Include="Ast\GoExpression.cs" />
+    <Compile Include="Ast\GoField.cs" />
+    <Compile Include="Ast\GoFieldList.cs" />
+    <Compile Include="Ast\GoFile.cs" />
+    <Compile Include="Ast\GoNode.cs" />
+    <Compile Include="Ast\GoIdentifier.cs" />
+    <Compile Include="Ast\GoImport.cs" />
+    <Compile Include="Ast\GoObject.cs" />
+    <Compile Include="Ast\GoObjectKind.cs" />
+    <Compile Include="Ast\GoScope.cs" />
+    <Compile Include="Ast\GoStatement.cs" />
     <Compile Include="GoAuthoringScope.cs" />
     <Compile Include="GoColorizer.cs" />
     <Compile Include="GoHelper.cs" />
     <Compile Include="GoLanguageService.cs" />
     <Compile Include="GoLexer.cs" />
+    <Compile Include="GoParser.cs" />
     <Compile Include="GoScanner.cs" />
     <Compile Include="GoSource.cs" />
     <Compile Include="GoToken.cs" />
@@ -169,6 +184,7 @@
   <ItemGroup>
     <Content Include="Resources\Package.ico" />
   </ItemGroup>
+  <ItemGroup />
   <PropertyGroup>
     <UseCodebase>true</UseCodebase>
   </PropertyGroup>
