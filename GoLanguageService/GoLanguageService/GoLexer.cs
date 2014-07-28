@@ -12,6 +12,13 @@ namespace Fitbos.GoLanguageService
 	/// </summary>
 	public class GoLexer
 	{
+		public enum State
+		{
+			Normal,
+			InsideComment,
+			InsideString,
+		}
+
 		public const uint MaxRune = 0x0010FFFF;
 
 		private string m_src;
@@ -47,6 +54,19 @@ namespace Fitbos.GoLanguageService
 			this.SkipWhitespace();
 
 			token.Position = m_offset;
+
+			if( (State)state == State.InsideComment )
+			{
+				if( m_eof )
+				{
+					token.ID = GoTokenID.EOF;
+					return token;
+				}
+				var comment = this.ScanComment( ref state );
+				token.ID = GoTokenID.COMMENT;
+				token.Text = comment;
+				return token;
+			}
 
 			var insertSemicolon = false;
 			var ch = m_ch;
@@ -90,163 +110,167 @@ namespace Fitbos.GoLanguageService
 						token.Text = "\n";
 						return token;
 					}
+					token.ID = GoTokenID.EOF;
 				}
-				switch( ch )
+				else
 				{
-					case '\n':
-						m_insertSemicolon = false;
-						token.ID = GoTokenID.SEMICOLON;
-						token.Text = "\n";
-						return token;
-					case '\"':
-						insertSemicolon = true;
-						token.ID = GoTokenID.STRING;
-						token.Text = this.ScanString();
-						break;
-					case '\'':
-						insertSemicolon = true;
-						token.ID = GoTokenID.CHAR;
-						token.Text = this.ScanCharacter();
-						break;
-					case '`':
-						insertSemicolon = true;
-						token.ID = GoTokenID.STRING;
-						token.Text = this.ScanRawString();
-						break;
-					case ':':
-						token.ID = this.Switch2( GoTokenID.COLON, GoTokenID.DEFINE );
-						break;
-					case '.':
-						if( '0' <= m_ch && m_ch <= '9' )
-						{
+					switch( ch )
+					{
+						case '\n':
+							m_insertSemicolon = false;
+							token.ID = GoTokenID.SEMICOLON;
+							token.Text = "\n";
+							return token;
+						case '\"':
 							insertSemicolon = true;
-							this.ScanNumber( out token.ID, out token.Text, true );
-						}
-						else if( m_ch == '.' )
-						{
-							this.Next();
-							if( m_ch == '.' )
+							token.ID = GoTokenID.STRING;
+							token.Text = this.ScanString();
+							break;
+						case '\'':
+							insertSemicolon = true;
+							token.ID = GoTokenID.CHAR;
+							token.Text = this.ScanCharacter();
+							break;
+						case '`':
+							insertSemicolon = true;
+							token.ID = GoTokenID.STRING;
+							token.Text = this.ScanRawString();
+							break;
+						case ':':
+							token.ID = this.Switch2( GoTokenID.COLON, GoTokenID.DEFINE );
+							break;
+						case '.':
+							if( '0' <= m_ch && m_ch <= '9' )
+							{
+								insertSemicolon = true;
+								this.ScanNumber( out token.ID, out token.Text, true );
+							}
+							else if( m_ch == '.' )
 							{
 								this.Next();
-								token.ID = GoTokenID.ELLIPSIS;
+								if( m_ch == '.' )
+								{
+									this.Next();
+									token.ID = GoTokenID.ELLIPSIS;
+								}
 							}
-						}
-						else
-						{
-							token.ID = GoTokenID.PERIOD;
-						}
-						break;
-					case ',':
-						token.ID = GoTokenID.COMMA;
-						break;
-					case ';':
-						token.ID = GoTokenID.SEMICOLON;
-						token.Text = ";";
-						break;
-					case '(':
-						token.ID = GoTokenID.LPAREN;
-						break;
-					case ')':
-						insertSemicolon = true;
-						token.ID = GoTokenID.RPAREN;
-						break;
-					case '[':
-						token.ID = GoTokenID.LBRACK;
-						break;
-					case ']':
-						insertSemicolon = true;
-						token.ID = GoTokenID.RBRACK;
-						break;
-					case '{':
-						token.ID = GoTokenID.LBRACE;
-						break;
-					case '}':
-						insertSemicolon = true;
-						token.ID = GoTokenID.RBRACE;
-						break;
-					case '+':
-						token.ID = this.Switch3( GoTokenID.ADD, GoTokenID.ADD_ASSIGN, '+', GoTokenID.INC );
-						if( token.ID == GoTokenID.INC )
-						{
-							insertSemicolon = true;
-						}
-						break;
-					case '-':
-						token.ID = this.Switch3( GoTokenID.SUB, GoTokenID.SUB_ASSIGN, '-', GoTokenID.DEC );
-						if( token.ID == GoTokenID.DEC )
-						{
-							insertSemicolon = true;
-						}
-						break;
-					case '*':
-						token.ID = this.Switch2( GoTokenID.MUL, GoTokenID.MUL_ASSIGN );
-						break;
-					case '/':
-						if( m_ch == '/' || m_ch == '*' )
-						{
-							if( m_insertSemicolon && this.FindLineEnd() )
+							else
 							{
-								m_ch = '/';
-								m_offset = token.Position;
-								m_readOffset = m_offset + 1;
-								m_insertSemicolon = false;
-								token.ID = GoTokenID.SEMICOLON;
-								token.Text = "\n";
-								return token;
+								token.ID = GoTokenID.PERIOD;
 							}
-							token.Text = this.ScanComment();
-							token.ID = GoTokenID.COMMENT;
-						}
-						else
-						{
-							token.ID = this.Switch2( GoTokenID.QUO, GoTokenID.QUO_ASSIGN );
-						}
-						break;
-					case '%':
-						token.ID = this.Switch2( GoTokenID.REM, GoTokenID.REM_ASSIGN );
-						break;
-					case '^':
-						token.ID = this.Switch2( GoTokenID.XOR, GoTokenID.XOR_ASSIGN );
-						break;
-					case '<':
-						if( m_ch == '-' )
-						{
-							this.Next();
-							token.ID = GoTokenID.ARROW;
-						}
-						else
-						{
-							token.ID = this.Switch4( GoTokenID.LSS, GoTokenID.LEQ, '<', GoTokenID.SHL, GoTokenID.SHL_ASSIGN );
-						}
-						break;
-					case '>':
-						token.ID = this.Switch4( GoTokenID.GTR, GoTokenID.GEQ, '>', GoTokenID.SHR, GoTokenID.SHR_ASSIGN );
-						break;
-					case '=':
-						token.ID = this.Switch2( GoTokenID.ASSIGN, GoTokenID.EQL );
-						break;
-					case '!':
-						token.ID = this.Switch2( GoTokenID.NOT, GoTokenID.NEQ );
-						break;
-					case '&':
-						if( m_ch == '^' )
-						{
-							this.Next();
-							token.ID = this.Switch2( GoTokenID.AND_NOT, GoTokenID.AND_NOT_ASSIGN );
-						}
-						else
-						{
-							token.ID = this.Switch3( GoTokenID.AND, GoTokenID.AND_ASSIGN, '&', GoTokenID.LAND );
-						}
-						break;
-					case '|':
-						token.ID = this.Switch3( GoTokenID.OR, GoTokenID.OR_ASSIGN, '|', GoTokenID.LOR );
-						break;
-					default:
-						insertSemicolon = m_insertSemicolon;
-						token.ID = GoTokenID.ILLEGAL;
-						token.Text = ch.ToString();
-						break;
+							break;
+						case ',':
+							token.ID = GoTokenID.COMMA;
+							break;
+						case ';':
+							token.ID = GoTokenID.SEMICOLON;
+							token.Text = ";";
+							break;
+						case '(':
+							token.ID = GoTokenID.LPAREN;
+							break;
+						case ')':
+							insertSemicolon = true;
+							token.ID = GoTokenID.RPAREN;
+							break;
+						case '[':
+							token.ID = GoTokenID.LBRACK;
+							break;
+						case ']':
+							insertSemicolon = true;
+							token.ID = GoTokenID.RBRACK;
+							break;
+						case '{':
+							token.ID = GoTokenID.LBRACE;
+							break;
+						case '}':
+							insertSemicolon = true;
+							token.ID = GoTokenID.RBRACE;
+							break;
+						case '+':
+							token.ID = this.Switch3( GoTokenID.ADD, GoTokenID.ADD_ASSIGN, '+', GoTokenID.INC );
+							if( token.ID == GoTokenID.INC )
+							{
+								insertSemicolon = true;
+							}
+							break;
+						case '-':
+							token.ID = this.Switch3( GoTokenID.SUB, GoTokenID.SUB_ASSIGN, '-', GoTokenID.DEC );
+							if( token.ID == GoTokenID.DEC )
+							{
+								insertSemicolon = true;
+							}
+							break;
+						case '*':
+							token.ID = this.Switch2( GoTokenID.MUL, GoTokenID.MUL_ASSIGN );
+							break;
+						case '/':
+							if( m_ch == '/' || m_ch == '*' )
+							{
+								if( m_insertSemicolon && this.FindLineEnd() )
+								{
+									m_ch = '/';
+									m_offset = token.Position;
+									m_readOffset = m_offset + 1;
+									m_insertSemicolon = false;
+									token.ID = GoTokenID.SEMICOLON;
+									token.Text = "\n";
+									return token;
+								}
+								token.Text = this.ScanComment( ref state );
+								token.ID = GoTokenID.COMMENT;
+							}
+							else
+							{
+								token.ID = this.Switch2( GoTokenID.QUO, GoTokenID.QUO_ASSIGN );
+							}
+							break;
+						case '%':
+							token.ID = this.Switch2( GoTokenID.REM, GoTokenID.REM_ASSIGN );
+							break;
+						case '^':
+							token.ID = this.Switch2( GoTokenID.XOR, GoTokenID.XOR_ASSIGN );
+							break;
+						case '<':
+							if( m_ch == '-' )
+							{
+								this.Next();
+								token.ID = GoTokenID.ARROW;
+							}
+							else
+							{
+								token.ID = this.Switch4( GoTokenID.LSS, GoTokenID.LEQ, '<', GoTokenID.SHL, GoTokenID.SHL_ASSIGN );
+							}
+							break;
+						case '>':
+							token.ID = this.Switch4( GoTokenID.GTR, GoTokenID.GEQ, '>', GoTokenID.SHR, GoTokenID.SHR_ASSIGN );
+							break;
+						case '=':
+							token.ID = this.Switch2( GoTokenID.ASSIGN, GoTokenID.EQL );
+							break;
+						case '!':
+							token.ID = this.Switch2( GoTokenID.NOT, GoTokenID.NEQ );
+							break;
+						case '&':
+							if( m_ch == '^' )
+							{
+								this.Next();
+								token.ID = this.Switch2( GoTokenID.AND_NOT, GoTokenID.AND_NOT_ASSIGN );
+							}
+							else
+							{
+								token.ID = this.Switch3( GoTokenID.AND, GoTokenID.AND_ASSIGN, '&', GoTokenID.LAND );
+							}
+							break;
+						case '|':
+							token.ID = this.Switch3( GoTokenID.OR, GoTokenID.OR_ASSIGN, '|', GoTokenID.LOR );
+							break;
+						default:
+							insertSemicolon = m_insertSemicolon;
+							token.ID = GoTokenID.ILLEGAL;
+							token.Text = ch.ToString();
+							break;
+					}
 				}
 			}
 
@@ -280,12 +304,16 @@ namespace Fitbos.GoLanguageService
 			return tok0;
 		}
 
-		private string ScanComment()
+		private string ScanComment( ref int state )
 		{
 			var offset = m_offset - 1;
+			if( offset == -1 )
+			{
+				offset = 0;
+			}
 			var hasCR = false;
 
-			if( m_ch == '/' )
+			if( m_ch == '/' && state != (int)State.InsideComment )
 			{
 				this.Next();
 				while( m_ch != '\n' && m_eof == false )
@@ -302,10 +330,24 @@ namespace Fitbos.GoLanguageService
 				/*
 				if( offset == 0 )
 				{
-					this.InterpretLineComment( m_source.Substring( offset, m_offset ) );
+					this.InterpretLineComment( m_source.Substring( offset, m_offset - offset ) );
 				}
 				*/
 				goto exit;
+			}
+
+			if( state == (int)State.InsideComment )
+			{
+				if( m_readOffset < m_src.Length )
+				{
+					var next = m_src[m_readOffset];
+					if( m_ch == '*' && next == '/' )
+					{
+						this.Next();
+						this.Next();
+						goto exit;
+					}
+				}
 			}
 
 			this.Next();
@@ -324,15 +366,21 @@ namespace Fitbos.GoLanguageService
 				}
 			}
 
-			this.Error( offset, "Comment not terminated" );
+			m_eof = true;
+			state = (int)State.InsideComment;
+			var comment = m_src.Substring( offset, m_offset - offset );
+			return comment;
+
+			//this.Error( offset, "Comment not terminated" );
 
 		exit:
-			var lit = m_src.Substring( offset, m_offset );
+			var lit = m_src.Substring( offset, m_offset - offset );
 			if( hasCR )
 			{
 				lit = StripCR( lit );
 			}
 
+			state = (int)State.Normal;
 			return lit;
 		}
 
@@ -449,7 +497,7 @@ namespace Fitbos.GoLanguageService
 				}
 			}
 
-			var lit = m_src.Substring( offset, m_offset );
+			var lit = m_src.Substring( offset, m_offset - offset );
 			if( hasCR )
 			{
 				lit = StripCR( lit );
@@ -496,7 +544,7 @@ namespace Fitbos.GoLanguageService
 				this.Error( offset, "Illegal rune literal" );
 			}
 
-			return m_src.Substring( offset, m_offset );
+			return m_src.Substring( offset, m_offset - offset );
 		}
 
 		private bool ScanEscape( char quote )
@@ -593,8 +641,13 @@ namespace Fitbos.GoLanguageService
 			return true;
 		}
 
-		private static int DigitVal( char ch )
+		private int DigitVal( char ch )
 		{
+			if( m_eof )
+			{
+				return 16;
+			}
+
 			if( '0' <= ch && ch <= '9' )
 			{
 				return (int)( ch - '0' );
@@ -633,11 +686,15 @@ namespace Fitbos.GoLanguageService
 				}
 			}
 
-			return m_src.Substring( offset, m_offset );
+			return m_src.Substring( offset, m_offset - offset );
 		}
 
-		private static bool IsLetter( char ch )
+		private bool IsLetter( char ch )
 		{
+			if( m_eof )
+			{
+				return false;
+			}
 			return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_' || ( ch >= 0x80 && char.IsLetter( ch ) );
 		}
 
@@ -658,6 +715,10 @@ namespace Fitbos.GoLanguageService
 				( m_ch == '\n' && m_insertSemicolon == false ) ||
 				m_ch == '\r' )
 			{
+				if( m_eof )
+				{
+					break;
+				}
 				this.Next();
 			}
 		}
@@ -715,11 +776,15 @@ namespace Fitbos.GoLanguageService
 			{
 				this.Next();
 			}
-			return m_src.Substring( offset, m_offset );
+			return m_src.Substring( offset, m_offset - offset );
 		}
 
-		private static bool IsDigit( char ch )
+		private bool IsDigit( char ch )
 		{
+			if( m_eof )
+			{
+				return false;
+			}
 			return '0' <= ch && ch <= '9' || ( ch >= 0x80 && char.IsDigit( ch ) );
 		}
 
@@ -799,7 +864,7 @@ namespace Fitbos.GoLanguageService
 			}
 
 		exit:
-			lit = m_src.Substring( offset, m_offset );
+			lit = m_src.Substring( offset, m_offset - offset );
 		}
 
 		private void ScanMantissa( int b )

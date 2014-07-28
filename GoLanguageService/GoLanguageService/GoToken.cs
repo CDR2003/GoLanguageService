@@ -9,6 +9,12 @@ namespace Fitbos.GoLanguageService
 {
 	public class GoToken
 	{
+		public const int LowestPrecedence = 0;
+
+		public const int UnaryPrecedence = 6;
+
+		public const int HighestPrecedence = 7;
+
 		public int Position;
 
 		public GoTokenID ID;
@@ -54,7 +60,7 @@ namespace Fitbos.GoLanguageService
 			s_tokens.Add( GoTokenID.QUO_ASSIGN, "/=" );
 			s_tokens.Add( GoTokenID.REM_ASSIGN, "%=" );
 
-			s_tokens.Add( GoTokenID.ADD_ASSIGN, "&=" );
+			s_tokens.Add( GoTokenID.AND_ASSIGN, "&=" );
 			s_tokens.Add( GoTokenID.OR_ASSIGN, "|=" );
 			s_tokens.Add( GoTokenID.XOR_ASSIGN, "^=" );
 			s_tokens.Add( GoTokenID.SHL_ASSIGN, "<<=" );
@@ -136,6 +142,67 @@ namespace Fitbos.GoLanguageService
 				return tok;
 			}
 			return GoTokenID.IDENT;
+		}
+
+		public static int GetPrecedence( GoTokenID op )
+		{
+			switch( op )
+			{
+				case GoTokenID.LOR:
+					return 1;
+				case GoTokenID.LAND:
+					return 2;
+				case GoTokenID.EQL:
+				case GoTokenID.NEQ:
+				case GoTokenID.LSS:
+				case GoTokenID.LEQ:
+				case GoTokenID.GTR:
+				case GoTokenID.GEQ:
+					return 3;
+				case GoTokenID.ADD:
+				case GoTokenID.SUB:
+				case GoTokenID.OR:
+				case GoTokenID.XOR:
+					return 4;
+				case GoTokenID.MUL:
+				case GoTokenID.QUO:
+				case GoTokenID.REM:
+				case GoTokenID.SHL:
+				case GoTokenID.SHR:
+				case GoTokenID.AND:
+				case GoTokenID.AND_NOT:
+					return 5;
+			}
+			return LowestPrecedence;
+		}
+
+		public static bool IsLiteral( GoTokenID tok )
+		{
+			return GoTokenID.literal_beg < tok && tok < GoTokenID.literal_end;
+		}
+
+		public static bool IsOperator( GoTokenID tok )
+		{
+			return GoTokenID.operator_beg < tok && tok < GoTokenID.operator_end;
+		}
+
+		public static bool IsKeyword( GoTokenID tok )
+		{
+			return GoTokenID.keyword_beg < tok && tok < GoTokenID.keyword_end;
+		}
+
+		public static string ToString( GoTokenID tok )
+		{
+			var s = "";
+			if( 0 <= tok && tok < (GoTokenID)s_tokens.Count )
+			{
+				s = s_tokens[tok];
+			}
+			if( s == "" )
+			{
+				s = "token(" + (int)tok + ")";
+			}
+			return s;
 		}
 	}
 }

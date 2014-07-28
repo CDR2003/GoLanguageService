@@ -12,47 +12,67 @@ namespace Fitbos.GoLanguageService
 {
 	public class GoScanner : IScanner
 	{
-		private List<GoToken> m_tokens;
-
-		private int m_currentIndex;
-
-		private Process m_scannerApp;
+		private GoLexer m_lexer;
 
 		public GoScanner()
 		{
-			m_tokens = new List<GoToken>();
-			m_currentIndex = 0;
-
-			m_scannerApp = new Process();
-			m_scannerApp.StartInfo.FileName = GoHelper.ScannerPath;
-			m_scannerApp.StartInfo.CreateNoWindow = true;
-			m_scannerApp.StartInfo.RedirectStandardInput = true;
-			m_scannerApp.StartInfo.RedirectStandardOutput = true;
-			m_scannerApp.StartInfo.UseShellExecute = false;
+			m_lexer = new GoLexer();
 		}
 
 		public bool ScanTokenAndProvideInfoAboutIt( TokenInfo tokenInfo, ref int state )
 		{
-			if( m_currentIndex >= m_tokens.Count )
+			var token = m_lexer.GetToken( ref state );
+			if( token.ID == GoTokenID.EOF )
 			{
 				return false;
 			}
 
-			m_currentIndex++;
+			if( string.IsNullOrEmpty( token.Text ) )
+			{
+				token.Text = GoToken.ToString( token.ID );
+			}
+
+			tokenInfo.StartIndex = token.Position;
+			tokenInfo.EndIndex = tokenInfo.StartIndex + token.Text.Length - 1;
+			tokenInfo.Token = (int)token.ID;
+			tokenInfo.Type = GetType( token.ID );
+			tokenInfo.Color = GetColor( tokenInfo.Type );
+			tokenInfo.Trigger = GetTriggers( token.ID );
 			return true;
 		}
 
 		public void SetSource( string source, int offset )
 		{
-			m_scannerApp.Start();
-			m_scannerApp.StandardInput.Write( source.Substring( offset ) );
-			m_scannerApp.StandardInput.Close();
+			m_lexer.SetSource( source, offset );
+		}
 
-			var json = m_scannerApp.StandardOutput.ReadToEnd();
-			m_scannerApp.WaitForExit();
-
-			m_tokens = JsonConvert.DeserializeObject<List<GoToken>>( json );
-			m_currentIndex = 0;
+		private static TokenType GetType( GoTokenID id )
+		{
+			if( GoToken.IsKeyword( id ) )
+			{
+				return TokenType.Keyword;
+			}
+			if( GoToken.IsOperator( id ) )
+			{
+				return TokenType.Operator;
+			}
+			if( GoToken.IsLiteral( id ) )
+			{
+				if( id == GoTokenID.STRING || id == GoTokenID.CHAR )
+				{
+					return TokenType.String;
+				}
+				return TokenType.Literal;
+			}
+			if( id == GoTokenID.COMMENT )
+			{
+				return TokenType.Comment;
+			}
+			if( id == GoTokenID.IDENT )
+			{
+				return TokenType.Identifier;
+			}
+			return TokenType.Unknown;
 		}
 
 		private static TokenColor GetColor( TokenType type )
@@ -81,10 +101,10 @@ namespace Fitbos.GoLanguageService
 			return TokenColor.Text;
 		}
 
-		private static TokenTriggers GetTriggers( int tokenID )
+		private static TokenTriggers GetTriggers( GoTokenID tokenID )
 		{
 			var result = TokenTriggers.None;
-			switch( (GoTokenID)tokenID )
+			switch( tokenID )
 			{
 				case GoTokenID.PERIOD:
 					result |= TokenTriggers.MemberSelect;
