@@ -12,13 +12,15 @@ namespace Fitbos.GoLanguageService
 	/// </summary>
 	public class GoLexer
 	{
-		private string m_source;
+		public const uint MaxRune = 0x0010FFFF;
+
+		private string m_src;
 
 		private int m_offset;
 
 		private int m_readOffset;
 
-		private char m_character;
+		private char m_ch;
 
 		private bool m_insertSemicolon;
 
@@ -32,8 +34,10 @@ namespace Fitbos.GoLanguageService
 		public void SetSource( string source, int offset )
 		{
 			this.Reset();
-			m_source = source;
+			m_src = source;
 			m_offset = offset;
+
+			this.Next();
 		}
 
 		public GoToken GetToken( ref int state )
@@ -45,13 +49,13 @@ namespace Fitbos.GoLanguageService
 			token.Position = m_offset;
 
 			var insertSemicolon = false;
-			var ch = m_character;
+			var ch = m_ch;
 			if( IsLetter( ch ) )
 			{
 				token.Text = this.ScanIdentifier();
 				if( token.Text.Length > 1 )
 				{
-					token.ID = LookUpToken( token.Text );
+					token.ID = GoToken.Lookup( token.Text );
 					switch( token.ID )
 					{
 						case GoTokenID.IDENT:
@@ -113,15 +117,15 @@ namespace Fitbos.GoLanguageService
 						token.ID = this.Switch2( GoTokenID.COLON, GoTokenID.DEFINE );
 						break;
 					case '.':
-						if( '0' <= m_character && m_character <= '9' )
+						if( '0' <= m_ch && m_ch <= '9' )
 						{
 							insertSemicolon = true;
 							this.ScanNumber( out token.ID, out token.Text, true );
 						}
-						else if( m_character == '.' )
+						else if( m_ch == '.' )
 						{
 							this.Next();
-							if( m_character == '.' )
+							if( m_ch == '.' )
 							{
 								this.Next();
 								token.ID = GoTokenID.ELLIPSIS;
@@ -178,11 +182,11 @@ namespace Fitbos.GoLanguageService
 						token.ID = this.Switch2( GoTokenID.MUL, GoTokenID.MUL_ASSIGN );
 						break;
 					case '/':
-						if( m_character == '/' || m_character == '*' )
+						if( m_ch == '/' || m_ch == '*' )
 						{
 							if( m_insertSemicolon && this.FindLineEnd() )
 							{
-								m_character = '/';
+								m_ch = '/';
 								m_offset = token.Position;
 								m_readOffset = m_offset + 1;
 								m_insertSemicolon = false;
@@ -205,7 +209,7 @@ namespace Fitbos.GoLanguageService
 						token.ID = this.Switch2( GoTokenID.XOR, GoTokenID.XOR_ASSIGN );
 						break;
 					case '<':
-						if( m_character == '-' )
+						if( m_ch == '-' )
 						{
 							this.Next();
 							token.ID = GoTokenID.ARROW;
@@ -225,7 +229,7 @@ namespace Fitbos.GoLanguageService
 						token.ID = this.Switch2( GoTokenID.NOT, GoTokenID.NEQ );
 						break;
 					case '&':
-						if( m_character == '^' )
+						if( m_ch == '^' )
 						{
 							this.Next();
 							token.ID = this.Switch2( GoTokenID.AND_NOT, GoTokenID.AND_NOT_ASSIGN );
@@ -251,70 +255,408 @@ namespace Fitbos.GoLanguageService
 			return token;
 		}
 
-		private GoTokenID Switch4( GoTokenID goTokenID1, GoTokenID goTokenID2, char p, GoTokenID goTokenID3, GoTokenID goTokenID4 )
+		private void Error( int offset, string message )
 		{
-			throw new NotImplementedException();
+
+		}
+
+		private GoTokenID Switch4( GoTokenID tok0, GoTokenID tok1, char ch2, GoTokenID tok2, GoTokenID tok3 )
+		{
+			if( m_ch == '=' )
+			{
+				this.Next();
+				return tok1;
+			}
+			if( m_ch == ch2 )
+			{
+				this.Next();
+				if( m_ch == '=' )
+				{
+					this.Next();
+					return tok3;
+				}
+				return tok2;
+			}
+			return tok0;
 		}
 
 		private string ScanComment()
 		{
-			throw new NotImplementedException();
+			var offset = m_offset - 1;
+			var hasCR = false;
+
+			if( m_ch == '/' )
+			{
+				this.Next();
+				while( m_ch != '\n' && m_eof == false )
+				{
+					if( m_ch == '\r' )
+					{
+						hasCR = true;
+					}
+					this.Next();
+				}
+
+				// Do not interpret line comment here.
+				// Line comment means comments start with "//line"
+				/*
+				if( offset == 0 )
+				{
+					this.InterpretLineComment( m_source.Substring( offset, m_offset ) );
+				}
+				*/
+				goto exit;
+			}
+
+			this.Next();
+			while( m_eof == false )
+			{
+				var ch = m_ch;
+				if( ch == '\r' )
+				{
+					hasCR = true;
+				}
+				this.Next();
+				if( ch == '*' && m_ch == '/' )
+				{
+					this.Next();
+					goto exit;
+				}
+			}
+
+			this.Error( offset, "Comment not terminated" );
+
+		exit:
+			var lit = m_src.Substring( offset, m_offset );
+			if( hasCR )
+			{
+				lit = StripCR( lit );
+			}
+
+			return lit;
+		}
+
+		private static string StripCR( string lit )
+		{
+			var result = "";
+			foreach( var ch in lit )
+			{
+				if( ch != '\r' )
+				{
+					result += ch;
+				}
+			}
+			return result;
 		}
 
 		private bool FindLineEnd()
 		{
-			throw new NotImplementedException();
+			while( m_ch == '/' || m_ch == '*' )
+			{
+				if( m_ch == '/' )
+				{
+					this.FindLineEndDefer( m_offset - 1 );
+					return true;
+				}
+				this.Next();
+				while( m_eof == false )
+				{
+					var ch = m_ch;
+					if( ch == '\n' )
+					{
+						this.FindLineEndDefer( m_offset - 1 );
+						return true;
+					}
+					this.Next();
+					if( ch == '*' && m_ch == '/' )
+					{
+						this.Next();
+						break;
+					}
+				}
+				this.SkipWhitespace();
+				if( m_eof || m_ch == '\n' )
+				{
+					this.FindLineEndDefer( m_offset - 1 );
+					return true;
+				}
+				if( m_ch != '/' )
+				{
+					this.FindLineEndDefer( m_offset - 1 );
+					return false;
+				}
+				this.Next();
+			}
+
+			this.FindLineEndDefer( m_offset - 1 );
+			return false;
 		}
 
-		private GoTokenID Switch3( GoTokenID goTokenID1, GoTokenID goTokenID2, char p, GoTokenID goTokenID3 )
+		private void FindLineEndDefer( int offset )
 		{
-			throw new NotImplementedException();
+			m_ch = '/';
+			m_offset = offset;
+			m_readOffset = offset + 1;
+			this.Next();
 		}
 
-		private GoTokenID Switch2( GoTokenID goTokenID1, GoTokenID goTokenID2 )
+		private GoTokenID Switch3( GoTokenID tok0, GoTokenID tok1, char ch2, GoTokenID tok2 )
 		{
-			throw new NotImplementedException();
+			if( m_ch == '=' )
+			{
+				this.Next();
+				return tok1;
+			}
+			if( m_ch == ch2 )
+			{
+				this.Next();
+				return tok2;
+			}
+			return tok0;
+		}
+
+		private GoTokenID Switch2( GoTokenID tok0, GoTokenID tok1 )
+		{
+			if( m_ch == '=' )
+			{
+				this.Next();
+				return tok1;
+			}
+			return tok0;
 		}
 
 		private string ScanRawString()
 		{
-			throw new NotImplementedException();
+			var offset = m_offset - 1;
+
+			var hasCR = false;
+			for( ; ; )
+			{
+				var ch = m_ch;
+				if( m_eof )
+				{
+					this.Error( offset, "Raw string literal not terminated" );
+					break;
+				}
+				this.Next();
+				if( ch == '`' )
+				{
+					break;
+				}
+				if( ch == '\r' )
+				{
+					hasCR = true;
+				}
+			}
+
+			var lit = m_src.Substring( offset, m_offset );
+			if( hasCR )
+			{
+				lit = StripCR( lit );
+			}
+
+			return lit;
 		}
 
 		private string ScanCharacter()
 		{
-			throw new NotImplementedException();
+			var offset = m_offset - 1;
+
+			var valid = true;
+			var n = 0;
+			for( ; ; )
+			{
+				var ch = m_ch;
+				if( ch == '\n' || m_eof )
+				{
+					if( valid )
+					{
+						this.Error( offset, "Rune literal not terminated" );
+						valid = false;
+					}
+					break;
+				}
+				this.Next();
+				if( ch == '\'' )
+				{
+					break;
+				}
+				n++;
+				if( ch == '\\' )
+				{
+					if( this.ScanEscape( '\'' ) == false )
+					{
+						valid = false;
+					}
+				}
+			}
+
+			if( valid && n != 1 )
+			{
+				this.Error( offset, "Illegal rune literal" );
+			}
+
+			return m_src.Substring( offset, m_offset );
+		}
+
+		private bool ScanEscape( char quote )
+		{
+			var offset = m_offset;
+
+			if( m_ch == quote )
+			{
+				this.Next();
+				return true;
+			}
+
+			int n;
+			uint b, max;
+			switch( m_ch )
+			{
+				case 'a':
+				case 'b':
+				case 'f':
+				case 'n':
+				case 'r':
+				case 't':
+				case 'v':
+				case '\\':
+					this.Next();
+					return true;
+				case '0':
+				case '1':
+				case '2':
+				case '3':
+				case '4':
+				case '5':
+				case '6':
+				case '7':
+					n = 3;
+					b = 8;
+					max = 255;
+					break;
+				case 'x':
+					this.Next();
+					n = 2;
+					b = 16;
+					max = 255;
+					break;
+				case 'u':
+					this.Next();
+					n = 4;
+					b = 16;
+					max = MaxRune;
+					break;
+				case 'U':
+					this.Next();
+					n = 8;
+					b = 16;
+					max = MaxRune;
+					break;
+				default:
+					if( m_eof )
+					{
+						this.Error( offset, "Escape sequence not terminated" );
+					}
+					else
+					{
+						this.Error( offset, "Unknow escape sequence" );
+					}
+					return false;
+			}
+
+			uint x = 0;
+			while( n > 0 )
+			{
+				var d = (uint)DigitVal( m_ch );
+				if( d >= b )
+				{
+					var message = string.Format( "Illegal character {0} in escape sequence", m_ch );
+					if( m_eof )
+					{
+						message = "Escape sequence not terminated";
+					}
+					this.Error( m_offset, message );
+					return false;
+				}
+				x = x * b + d;
+				this.Next();
+				n--;
+			}
+
+			if( x > max || 0xD800 <= x && x < 0xE000 )
+			{
+				this.Error( offset, "Escape sequence is invalid Unicode code point" );
+				return false;
+			}
+
+			return true;
+		}
+
+		private static int DigitVal( char ch )
+		{
+			if( '0' <= ch && ch <= '9' )
+			{
+				return (int)( ch - '0' );
+			}
+			else if( 'a' <= ch && ch <= 'f' )
+			{
+				return (int)( ch - 'a' + 10 );
+			}
+			else if( 'A' <= ch && ch <= 'F' )
+			{
+				return (int)( ch - 'A' + 10 );
+			}
+			return 16;
 		}
 
 		private string ScanString()
 		{
-			throw new NotImplementedException();
-		}
+			var offset = m_offset - 1;
 
-		private static GoTokenID LookUpToken( string lit )
-		{
-			throw new NotImplementedException();
+			for( ; ; )
+			{
+				var ch = m_ch;
+				if( ch == '\n' || m_eof )
+				{
+					this.Error( offset, "String literal not terminated" );
+					break;
+				}
+				this.Next();
+				if( ch == '\"' )
+				{
+					break;
+				}
+				if( ch == '\\' )
+				{
+					this.ScanEscape( '\"' );
+				}
+			}
+
+			return m_src.Substring( offset, m_offset );
 		}
 
 		private static bool IsLetter( char ch )
 		{
-			throw new NotImplementedException();
+			return 'a' <= ch && ch <= 'z' || 'A' <= ch && ch <= 'Z' || ch == '_' || ( ch >= 0x80 && char.IsLetter( ch ) );
 		}
 
 		private void Reset()
 		{
-			m_source = "";
+			m_src = "";
 			m_offset = 0;
-			m_character = ' ';
+			m_readOffset = 0;
+			m_ch = ' ';
 			m_insertSemicolon = false;
+			m_eof = false;
 		}
 
 		private void SkipWhitespace()
 		{
-			while( m_character == ' ' ||
-				m_character == '\t' || 
-				( m_character == '\n' && m_insertSemicolon == false ) ||
-				m_character == '\r' )
+			while( m_ch == ' ' ||
+				m_ch == '\t' ||
+				( m_ch == '\n' && m_insertSemicolon == false ) ||
+				m_ch == '\r' )
 			{
 				this.Next();
 			}
@@ -322,17 +664,150 @@ namespace Fitbos.GoLanguageService
 
 		private void Next()
 		{
-			throw new NotImplementedException();
+			if( m_readOffset < m_src.Length )
+			{
+				m_offset = m_readOffset;
+				if( m_ch == '\n' )
+				{
+					/*
+					s.lineOffset = s.offset
+					s.file.AddLine(s.offset)
+					*/
+				}
+				var r = m_src[m_readOffset];
+				var w = 1;
+				if( r == 0 )
+				{
+					this.Error( m_offset, "Illegal character NUL" );
+				}
+				else if( r >= 0x80 )
+				{
+					/*
+					r, w = utf8.DecodeRune(s.src[s.rdOffset:])
+					if r == utf8.RuneError && w == 1 {
+						s.error(s.offset, "illegal UTF-8 encoding")
+					} else if r == bom && s.offset > 0 {
+						s.error(s.offset, "illegal byte order mark")
+					}
+					*/
+				}
+				m_readOffset += w;
+				m_ch = r;
+			}
+			else
+			{
+				m_offset = m_src.Length;
+				if( m_ch == '\n' )
+				{
+					/*
+					s.lineOffset = s.offset
+					s.file.AddLine(s.offset)
+					*/
+				}
+				m_eof = true;
+			}
 		}
 
 		private string ScanIdentifier()
 		{
-			throw new NotImplementedException();
+			var offset = m_offset;
+			while( IsLetter( m_ch ) || IsDigit( m_ch ) )
+			{
+				this.Next();
+			}
+			return m_src.Substring( offset, m_offset );
 		}
 
-		private void ScanNumber( out GoTokenID p1, out string lit, bool p2 )
+		private static bool IsDigit( char ch )
 		{
-			throw new NotImplementedException();
+			return '0' <= ch && ch <= '9' || ( ch >= 0x80 && char.IsDigit( ch ) );
+		}
+
+		private void ScanNumber( out GoTokenID tok, out string lit, bool seenDecimalPoint )
+		{
+			var offset = m_offset;
+			tok = GoTokenID.INT;
+
+			if( seenDecimalPoint )
+			{
+				offset--;
+				tok = GoTokenID.FLOAT;
+				this.ScanMantissa( 10 );
+				goto exponent;
+			}
+
+			if( m_ch == '0' )
+			{
+				var offs = m_offset;
+				this.Next();
+				if( m_ch == 'x' || m_ch == 'X' )
+				{
+					this.Next();
+					this.ScanMantissa( 16 );
+					if( m_offset - offs <= 2 )
+					{
+						this.Error( offs, "Illegal hexadecimal number" );
+					}
+				}
+				else
+				{
+					var seenDecimalDigit = false;
+					this.ScanMantissa( 8 );
+					if( m_ch == '8' || m_ch == '9' )
+					{
+						seenDecimalDigit = true;
+						this.ScanMantissa( 10 );
+					}
+					if( m_ch == '.' || m_ch == 'e' || m_ch == 'E' || m_ch == 'i' )
+					{
+						goto fraction;
+					}
+					if( seenDecimalDigit )
+					{
+						this.Error( offs, "Illegal octal number" );
+					}
+				}
+				goto exit;
+			}
+
+			this.ScanMantissa( 10 );
+
+		fraction:
+			if( m_ch == '.' )
+			{
+				tok = GoTokenID.FLOAT;
+				this.Next();
+				this.ScanMantissa( 10 );
+			}
+
+		exponent:
+			if( m_ch == 'e' || m_ch == 'E' )
+			{
+				tok = GoTokenID.FLOAT;
+				this.Next();
+				if( m_ch == '-' || m_ch == '+' )
+				{
+					this.Next();
+				}
+				this.ScanMantissa( 10 );
+			}
+
+			if( m_ch == 'i' )
+			{
+				tok = GoTokenID.IMAG;
+				this.Next();
+			}
+
+		exit:
+			lit = m_src.Substring( offset, m_offset );
+		}
+
+		private void ScanMantissa( int b )
+		{
+			while( DigitVal( m_ch ) < b )
+			{
+				this.Next();
+			}
 		}
 
 	}
