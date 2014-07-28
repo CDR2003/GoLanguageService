@@ -21,7 +21,12 @@ namespace Fitbos.GoLanguageService
 
 		public bool ScanTokenAndProvideInfoAboutIt( TokenInfo tokenInfo, ref int state )
 		{
-			var token = m_lexer.GetToken( ref state );
+			GoToken token = null;
+			do
+			{
+				token = m_lexer.GetToken( ref state );
+			} while( token.Text == "\n" && token.ID == GoTokenID.SEMICOLON );
+
 			if( token.ID == GoTokenID.EOF )
 			{
 				return false;

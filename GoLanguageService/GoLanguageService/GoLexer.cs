@@ -55,7 +55,7 @@ namespace Fitbos.GoLanguageService
 
 			token.Position = m_offset;
 
-			if( (State)state == State.InsideComment )
+			if( state == (int)State.InsideComment )
 			{
 				if( m_eof )
 				{
@@ -65,6 +65,19 @@ namespace Fitbos.GoLanguageService
 				var comment = this.ScanComment( ref state );
 				token.ID = GoTokenID.COMMENT;
 				token.Text = comment;
+				return token;
+			}
+
+			if( state == (int)State.InsideString )
+			{
+				if( m_eof )
+				{
+					token.ID = GoTokenID.EOF;
+					return token;
+				}
+				var str = this.ScanRawString( ref state );
+				token.ID = GoTokenID.STRING;
+				token.Text = str;
 				return token;
 			}
 
@@ -100,9 +113,25 @@ namespace Fitbos.GoLanguageService
 			}
 			else
 			{
+				if( m_eof )
+				{
+					token.ID = GoTokenID.EOF;
+					return token;
+				}
+
 				this.Next();
 				if( m_eof )
 				{
+					if( ch == '`' )
+					{
+						if( state == (int)State.Normal )
+						{
+							token.Text = "`";
+							token.ID = GoTokenID.STRING;
+							state = (int)State.InsideString;
+							return token;
+						}
+					}
 					if( m_insertSemicolon )
 					{
 						m_insertSemicolon = false;
@@ -134,7 +163,7 @@ namespace Fitbos.GoLanguageService
 						case '`':
 							insertSemicolon = true;
 							token.ID = GoTokenID.STRING;
-							token.Text = this.ScanRawString();
+							token.Text = this.ScanRawString( ref state );
 							break;
 						case ':':
 							token.ID = this.Switch2( GoTokenID.COLON, GoTokenID.DEFINE );
@@ -210,6 +239,7 @@ namespace Fitbos.GoLanguageService
 								if( m_insertSemicolon && this.FindLineEnd() )
 								{
 									m_ch = '/';
+									m_eof = false;
 									m_offset = token.Position;
 									m_readOffset = m_offset + 1;
 									m_insertSemicolon = false;
@@ -473,9 +503,23 @@ namespace Fitbos.GoLanguageService
 			return tok0;
 		}
 
-		private string ScanRawString()
+		private string ScanRawString( ref int state )
 		{
 			var offset = m_offset - 1;
+			if( offset == -1 )
+			{
+				offset = 0;
+			}
+
+			if( state == (int)State.InsideString )
+			{
+				if( m_ch == '`' )
+				{
+					this.Next();
+					state = (int)State.Normal;
+					return "`";
+				}
+			}
 
 			var hasCR = false;
 			for( ; ; )
@@ -483,8 +527,9 @@ namespace Fitbos.GoLanguageService
 				var ch = m_ch;
 				if( m_eof )
 				{
-					this.Error( offset, "Raw string literal not terminated" );
-					break;
+					//this.Error( offset, "Raw string literal not terminated" );
+					state = (int)State.InsideString;
+					return m_src.Substring( offset, m_offset - offset );
 				}
 				this.Next();
 				if( ch == '`' )
@@ -503,6 +548,7 @@ namespace Fitbos.GoLanguageService
 				lit = StripCR( lit );
 			}
 
+			state = (int)State.Normal;
 			return lit;
 		}
 
