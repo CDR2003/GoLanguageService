@@ -4,9 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Fitbos.GoLanguageService.Ast
+namespace Fitbos.GoLanguageService
 {
-	public abstract class GoExpression : GoNode
+	[Flags]
+	public enum GoChanDir
 	{
+		Send = 1,
+		Recv = 2,
 	}
 }

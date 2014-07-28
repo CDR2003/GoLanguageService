@@ -12,7 +12,7 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public int Package { get; set; }
 
-		public GoIdentifier Name { get; set; }
+		public GoIdent Name { get; set; }
 
 		public List<GoDeclaration> Declarations { get; set; }
 
@@ -20,7 +20,7 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public List<GoImport> Imports { get; set; }
 
-		public List<GoIdentifier> Unresolved { get; set; }
+		public List<GoIdent> Unresolved { get; set; }
 
 		public List<GoCommentGroup> Comments { get; set; }
 

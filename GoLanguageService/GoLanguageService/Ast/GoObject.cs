@@ -90,7 +90,7 @@ namespace Fitbos.GoLanguageService.Ast
 					var d = this.Declaration as GoAssignStatement;
 					foreach( var x in d.Lhs )
 					{
-						var ident = x as GoIdentifier;
+						var ident = x as GoIdent;
 						if( ident != null && ident.Name == name )
 						{
 							return ident.Pos;

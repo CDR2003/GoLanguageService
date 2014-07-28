@@ -127,21 +127,43 @@
     </COMReference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Ast\Expr\GoArrayType.cs" />
+    <Compile Include="Ast\Expr\GoBadExpr.cs" />
+    <Compile Include="Ast\Expr\GoBasicLit.cs" />
+    <Compile Include="Ast\Expr\GoBinaryExpr.cs" />
+    <Compile Include="Ast\Expr\GoCallExpr.cs" />
+    <Compile Include="Ast\Expr\GoChanType.cs" />
     <Compile Include="Ast\GoComment.cs" />
     <Compile Include="Ast\GoCommentGroup.cs" />
+    <Compile Include="Ast\Expr\GoCompositeLit.cs" />
     <Compile Include="Ast\GoDeclaration.cs" />
-    <Compile Include="Ast\GoExpression.cs" />
+    <Compile Include="Ast\Expr\GoEllipsis.cs" />
+    <Compile Include="Ast\Expr\GoExpr.cs" />
     <Compile Include="Ast\GoField.cs" />
     <Compile Include="Ast\GoFieldList.cs" />
     <Compile Include="Ast\GoFile.cs" />
+    <Compile Include="Ast\Expr\GoFuncLit.cs" />
+    <Compile Include="Ast\Expr\GoFuncType.cs" />
+    <Compile Include="Ast\Expr\GoIndexExpr.cs" />
+    <Compile Include="Ast\Expr\GoInterfaceType.cs" />
+    <Compile Include="Ast\Expr\GoKeyValueExpr.cs" />
+    <Compile Include="Ast\Expr\GoMapType.cs" />
     <Compile Include="Ast\GoNode.cs" />
-    <Compile Include="Ast\GoIdentifier.cs" />
+    <Compile Include="Ast\Expr\GoIdent.cs" />
     <Compile Include="Ast\GoImport.cs" />
     <Compile Include="Ast\GoObject.cs" />
     <Compile Include="Ast\GoObjectKind.cs" />
+    <Compile Include="Ast\Expr\GoParenExpr.cs" />
     <Compile Include="Ast\GoScope.cs" />
-    <Compile Include="Ast\GoStatement.cs" />
+    <Compile Include="Ast\Expr\GoSelectorExpr.cs" />
+    <Compile Include="Ast\Expr\GoSliceExpr.cs" />
+    <Compile Include="Ast\Expr\GoStarExpr.cs" />
+    <Compile Include="Ast\GoStmt.cs" />
+    <Compile Include="Ast\Expr\GoStructType.cs" />
+    <Compile Include="Ast\Expr\GoTypeAssertExpr.cs" />
+    <Compile Include="Ast\Expr\GoUnaryExpr.cs" />
     <Compile Include="GoAuthoringScope.cs" />
+    <Compile Include="GoChanDir.cs" />
     <Compile Include="GoColorizer.cs" />
     <Compile Include="GoHelper.cs" />
     <Compile Include="GoLanguageService.cs" />

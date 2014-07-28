@@ -10,11 +10,11 @@ namespace Fitbos.GoLanguageService.Ast
 	{
 		public GoCommentGroup Doc { get; set; }
 
-		public List<GoIdentifier> Names { get; set; }
+		public List<GoIdent> Names { get; set; }
 
-		public GoExpression Type { get; set; }
+		public GoExpr Type { get; set; }
 
-		public GoBasicLiteral Tag { get; set; }
+		public GoBasicLit Tag { get; set; }
 
 		public GoCommentGroup Comment { get; set; }
 

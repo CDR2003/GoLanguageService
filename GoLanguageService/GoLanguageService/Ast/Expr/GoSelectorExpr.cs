@@ -6,19 +6,17 @@ using System.Threading.Tasks;
 
 namespace Fitbos.GoLanguageService.Ast
 {
-	public class GoIdentifier : GoNode
+	public class GoSelectorExpr : GoExpr
 	{
-		public int NamePos { get; set; }
+		public GoExpr X { get; set; }
 
-		public string Name { get; set; }
-
-		public GoObject Obj { get; set; }
+		public GoIdent Sel { get; set; }
 
 		public override int Pos
 		{
 			get
 			{
-				return this.NamePos;
+				return this.X.Pos;
 			}
 		}
 
@@ -26,7 +24,7 @@ namespace Fitbos.GoLanguageService.Ast
 		{
 			get
 			{
-				return this.NamePos + this.Name.Length;
+				return this.Sel.End;
 			}
 		}
 	}
