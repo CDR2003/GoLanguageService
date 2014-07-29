@@ -199,6 +199,7 @@
     <Compile Include="GoParser.cs" />
     <Compile Include="GoScanner.cs" />
     <Compile Include="GoSource.cs" />
+    <Compile Include="GoSourceFile.cs" />
     <Compile Include="GoToken.cs" />
     <Compile Include="GoTokenID.cs" />
     <Compile Include="Guids.cs" />
