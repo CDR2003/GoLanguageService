@@ -20,15 +20,20 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public GoObject Lookup( string name )
 		{
-			return this.Objects[name];
+			GoObject result = null;
+			if( this.Objects.TryGetValue( name, out result ) )
+			{
+				return result;
+			}
+			return null;
 		}
 
 		public GoObject Insert( GoObject obj )
 		{
-			var alt = this.Objects[obj.Name];
+			var alt = this.Lookup( obj.Name );
 			if( alt == null )
 			{
-				this.Objects[obj.Name] = obj;
+				this.Objects.Add( obj.Name, obj );
 			}
 			return alt;
 		}

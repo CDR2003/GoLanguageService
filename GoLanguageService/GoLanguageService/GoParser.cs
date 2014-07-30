@@ -1984,7 +1984,7 @@ namespace Fitbos.GoLanguageService
 		private void OpenLabelScope()
 		{
 			m_labelScope = new GoScope( m_labelScope );
-			m_targetStack.Add( null );
+			m_targetStack.Add( new List<GoIdent>() );
 		}
 
 		private void ParseSignature( out GoFieldList parameters, out GoFieldList results, GoScope scope )

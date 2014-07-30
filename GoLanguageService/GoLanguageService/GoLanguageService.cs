@@ -57,6 +57,7 @@ namespace Fitbos.GoLanguageService
 		{
 			var fileSet = new GoSourceFileSet();
 			var parser = new GoParser( fileSet, req.FileName, req.Text );
+			var file = parser.ParseFile();
 			return new GoAuthoringScope();
 		}
 
