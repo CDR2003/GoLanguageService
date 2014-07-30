@@ -62,8 +62,9 @@ namespace Fitbos.GoLanguageService.Ast
 				}
 
 				var n = 0;
-				foreach( var line in lines )
+				for( int i = 0; i < lines.Count; i++ )
 				{
+					var line = lines[i];
 					if( line != "" || ( n > 0 && lines[n - 1] != "" ) )
 					{
 						lines[n] = line;
@@ -79,6 +80,11 @@ namespace Fitbos.GoLanguageService.Ast
 
 				return string.Join( "\n", lines );
 			}
+		}
+
+		public GoCommentGroup( List<GoComment> comments )
+		{
+			this.Comments = comments;
 		}
 
 		private static string StripTrailingWhitespace( string s )

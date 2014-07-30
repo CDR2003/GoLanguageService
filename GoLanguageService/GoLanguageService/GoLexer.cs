@@ -21,11 +21,15 @@ namespace Fitbos.GoLanguageService
 
 		public const uint MaxRune = 0x0010FFFF;
 
+		private GoSourceFile m_file;
+
 		private string m_src;
 
 		private int m_offset;
 
 		private int m_readOffset;
+
+		private int m_lineOffset;
 
 		private char m_ch;
 
@@ -38,9 +42,10 @@ namespace Fitbos.GoLanguageService
 			this.Reset();
 		}
 
-		public void SetSource( string source, int offset )
+		public void SetSource( GoSourceFile file, string source, int offset )
 		{
 			this.Reset();
+			m_file = file;
 			m_src = source;
 			m_offset = offset;
 
@@ -53,7 +58,7 @@ namespace Fitbos.GoLanguageService
 
 			this.SkipWhitespace();
 
-			token.Position = m_offset;
+			token.Position = m_file.Pos( m_offset );
 
 			if( state == (int)State.InsideComment )
 			{
@@ -240,7 +245,7 @@ namespace Fitbos.GoLanguageService
 								{
 									m_ch = '/';
 									m_eof = false;
-									m_offset = token.Position;
+									m_offset = m_file.Offset( token.Position );
 									m_readOffset = m_offset + 1;
 									m_insertSemicolon = false;
 									token.ID = GoTokenID.SEMICOLON;
@@ -746,9 +751,11 @@ namespace Fitbos.GoLanguageService
 
 		private void Reset()
 		{
+			m_file = null;
 			m_src = "";
 			m_offset = 0;
 			m_readOffset = 0;
+			m_lineOffset = 0;
 			m_ch = ' ';
 			m_insertSemicolon = false;
 			m_eof = false;
@@ -776,10 +783,8 @@ namespace Fitbos.GoLanguageService
 				m_offset = m_readOffset;
 				if( m_ch == '\n' )
 				{
-					/*
-					s.lineOffset = s.offset
-					s.file.AddLine(s.offset)
-					*/
+					m_lineOffset = m_offset;
+					m_file.AddLine( m_offset );
 				}
 				var r = m_src[m_readOffset];
 				var w = 1;
@@ -806,10 +811,8 @@ namespace Fitbos.GoLanguageService
 				m_offset = m_src.Length;
 				if( m_ch == '\n' )
 				{
-					/*
-					s.lineOffset = s.offset
-					s.file.AddLine(s.offset)
-					*/
+					m_lineOffset = m_offset;
+					m_file.AddLine( m_offset );
 				}
 				m_eof = true;
 			}

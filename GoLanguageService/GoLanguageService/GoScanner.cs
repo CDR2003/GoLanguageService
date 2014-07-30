@@ -48,7 +48,8 @@ namespace Fitbos.GoLanguageService
 
 		public void SetSource( string source, int offset )
 		{
-			m_lexer.SetSource( source, offset );
+			var file = new GoSourceFile( new GoSourceFileSet(), "", offset, source.Length );
+			m_lexer.SetSource( file, source, offset );
 		}
 
 		private static TokenType GetType( GoTokenID id )

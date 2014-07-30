@@ -27,5 +27,11 @@ namespace Fitbos.GoLanguageService.Ast
 				return this.Slash + this.Text.Length;
 			}
 		}
+
+		public GoComment( int slash, string text )
+		{
+			this.Slash = slash;
+			this.Text = text;
+		}
 	}
 }

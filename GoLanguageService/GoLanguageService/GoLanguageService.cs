@@ -55,21 +55,8 @@ namespace Fitbos.GoLanguageService
 
 		public override AuthoringScope ParseSource( ParseRequest req )
 		{
-			var lexer = new GoLexer();
-			lexer.SetSource( req.Text, 0 );
-
-			int state = 0;
-			var tokens = new List<GoToken>();
-			for(;;)
-			{
-				var token = lexer.GetToken( ref state );
-				if( token.ID == GoTokenID.EOF )
-				{
-					break;
-				}
-
-				tokens.Add( token );
-			}
+			var fileSet = new GoSourceFileSet();
+			var parser = new GoParser( fileSet, req.FileName, req.Text );
 			return new GoAuthoringScope();
 		}
 

@@ -18,6 +18,11 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public object Type { get; set; }
 
+		public GoObject()
+			: this( GoObjectKind.Bad, "" )
+		{
+		}
+
 		public GoObject( GoObjectKind kind, string name )
 		{
 			this.Kind = kind;
