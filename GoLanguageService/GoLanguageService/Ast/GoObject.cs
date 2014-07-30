@@ -12,7 +12,7 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public string Name { get; set; }
 
-		public object Declaration { get; set; }
+		public object Decl { get; set; }
 
 		public object Data { get; set; }
 
@@ -34,10 +34,10 @@ namespace Fitbos.GoLanguageService.Ast
 			get
 			{
 				var name = this.Name;
-				var type = this.Declaration.GetType();
+				var type = this.Decl.GetType();
 				if( type == typeof( GoField ) )
 				{
-					var d = this.Declaration as GoField;
+					var d = this.Decl as GoField;
 					foreach( var n in d.Names )
 					{
 						if( n.Name == name )
@@ -48,7 +48,7 @@ namespace Fitbos.GoLanguageService.Ast
 				}
 				else if( type == typeof( GoImportSpec ) )
 				{
-					var d = this.Declaration as GoImportSpec;
+					var d = this.Decl as GoImportSpec;
 					if( d.Name != null && d.Name.Name == name )
 					{
 						return d.Name.Pos;
@@ -57,7 +57,7 @@ namespace Fitbos.GoLanguageService.Ast
 				}
 				else if( type == typeof( GoValueSpec ) )
 				{
-					var d = this.Declaration as GoValueSpec;
+					var d = this.Decl as GoValueSpec;
 					foreach( var n in d.Names )
 					{
 						if( n.Name == name )
@@ -68,7 +68,7 @@ namespace Fitbos.GoLanguageService.Ast
 				}
 				else if( type == typeof( GoTypeSpec ) )
 				{
-					var d = this.Declaration as GoTypeSpec;
+					var d = this.Decl as GoTypeSpec;
 					if( d.Name.Name == name )
 					{
 						return d.Name.Pos;
@@ -76,7 +76,7 @@ namespace Fitbos.GoLanguageService.Ast
 				}
 				else if( type == typeof( GoFuncDecl ) )
 				{
-					var d = this.Declaration as GoFuncDecl;
+					var d = this.Decl as GoFuncDecl;
 					if( d.Name.Name == name )
 					{
 						return d.Name.Pos;
@@ -84,7 +84,7 @@ namespace Fitbos.GoLanguageService.Ast
 				}
 				else if( type == typeof( GoLabeledStmt ) )
 				{
-					var d = this.Declaration as GoLabeledStmt;
+					var d = this.Decl as GoLabeledStmt;
 					if( d.Label.Name == name )
 					{
 						return d.Label.Pos;
@@ -92,7 +92,7 @@ namespace Fitbos.GoLanguageService.Ast
 				}
 				else if( type == typeof( GoAssignStmt ) )
 				{
-					var d = this.Declaration as GoAssignStmt;
+					var d = this.Decl as GoAssignStmt;
 					foreach( var x in d.Lhs )
 					{
 						var ident = x as GoIdent;
