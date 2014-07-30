@@ -10,7 +10,7 @@ namespace Fitbos.GoLanguageService.Ast
 	{
 		public int Opening { get; set; }
 
-		public List<GoField> Fields { get; set; }
+		public List<GoField> List { get; set; }
 
 		public int Closing { get; set; }
 
@@ -22,9 +22,9 @@ namespace Fitbos.GoLanguageService.Ast
 				{
 					return this.Opening;
 				}
-				if( this.Fields.Count > 0 )
+				if( this.List.Count > 0 )
 				{
-					return this.Fields.First().Pos;
+					return this.List.First().Pos;
 				}
 				return 0;
 			}
@@ -38,20 +38,20 @@ namespace Fitbos.GoLanguageService.Ast
 				{
 					return this.Closing + 1;
 				}
-				if( this.Fields.Count > 0 )
+				if( this.List.Count > 0 )
 				{
-					return this.Fields.Last().End;
+					return this.List.Last().End;
 				}
 				return 0;
 			}
 		}
 
-		public int FieldCount
+		public int NumFields
 		{
 			get
 			{
 				var n = 0;
-				foreach( var g in this.Fields )
+				foreach( var g in this.List )
 				{
 					var m = g.Names.Count;
 					if( m == 0 )

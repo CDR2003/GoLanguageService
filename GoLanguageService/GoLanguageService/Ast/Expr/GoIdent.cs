@@ -14,13 +14,6 @@ namespace Fitbos.GoLanguageService.Ast
 
 		public GoObject Obj { get; set; }
 
-		public GoIdent( string name )
-		{
-			this.NamePos = 0;
-			this.Name = name;
-			this.Obj = null;
-		}
-
 		public static bool IsExported( string name )
 		{
 			return char.IsUpper( name[0] );
