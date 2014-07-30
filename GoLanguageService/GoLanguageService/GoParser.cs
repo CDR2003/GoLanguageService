@@ -563,8 +563,10 @@ namespace Fitbos.GoLanguageService
 				unparened is GoIdent ||
 				unparened is GoBasicLit ||
 				unparened is GoFuncLit ||
-				unparened is GoCompositeLit ||
-				unparened is GoParenExpr )
+				unparened is GoCompositeLit )
+			{
+			}
+			else if( unparened is GoParenExpr )
 			{
 				throw new Exception( "Unreachable" );
 			}
@@ -586,9 +588,14 @@ namespace Fitbos.GoLanguageService
 			return x;
 		}
 
-		private object Unparen( GoExpr x )
+		private static GoExpr Unparen( GoExpr x )
 		{
-			throw new NotImplementedException();
+			if( x is GoParenExpr )
+			{
+				var p = x as GoParenExpr;
+				x = Unparen( p.X );
+			}
+			return x;
 		}
 
 		private int SafePos( int pos )
@@ -1022,139 +1029,1250 @@ namespace Fitbos.GoLanguageService
 
 		private static bool IsTypeName( GoExpr x )
 		{
-			if( x is GoBadExpr )
+			if( x is GoBadExpr || x is GoIdent )
 			{
+				return true;
+			}
+			else if( x is GoSelectorExpr )
+			{
+				var t = x as GoSelectorExpr;
+				return t.X is GoIdent;
+			}
+			else
+			{
+				return false;
 			}
 		}
 
 		private static bool IsLiteralType( GoExpr x )
 		{
-			throw new NotImplementedException();
+			if( x is GoBadExpr ||
+				x is GoIdent ||
+				x is GoArrayType ||
+				x is GoStructType ||
+				x is GoMapType )
+			{
+				return true;
+			}
+			else if( x is GoSelectorExpr )
+			{
+				var t = x as GoSelectorExpr;
+				return t.X is GoIdent;
+			}
+			else
+			{
+				return false;
+			}
 		}
 
-		private GoExpr ParseCallOrConversion( GoExpr goExpr )
+		private GoCallExpr ParseCallOrConversion( GoExpr fun )
 		{
-			throw new NotImplementedException();
+			var lparen = this.Expect( GoTokenID.LPAREN );
+			m_exprLev++;
+			var list = new List<GoExpr>();
+			var ellipsis = 0;
+			while( m_tok != GoTokenID.RPAREN && m_tok != GoTokenID.EOF && ellipsis == 0 )
+			{
+				list.Add( this.ParseRhsOrType() );
+				if( m_tok == GoTokenID.ELLIPSIS )
+				{
+					ellipsis = m_pos;
+					this.Next();
+				}
+				if( this.AtComma( "argument list" ) == false )
+				{
+					break;
+				}
+				this.Next();
+			}
+			m_exprLev--;
+			var rparen = this.ExpectClosing( GoTokenID.RPAREN, "argument list" );
+
+			return new GoCallExpr { Fun = fun, Lparen = lparen, Args = list, Ellipsis = ellipsis, Rparen = rparen };
 		}
 
-		private GoExpr ParseIndexOrSlice( GoExpr goExpr )
+		private GoExpr ParseRhsOrType()
 		{
-			throw new NotImplementedException();
+			var old = m_inRhs;
+			m_inRhs = true;
+			var x = this.CheckExprOrType( this.ParseExpr( false ) );
+			m_inRhs = old;
+			return x;
 		}
 
-		private GoExpr ParseTypeAssertion( GoExpr goExpr )
+		private GoExpr ParseIndexOrSlice( GoExpr x )
 		{
-			throw new NotImplementedException();
+			const int N = 3;
+			var lbrack = this.Expect( GoTokenID.LBRACK );
+			m_exprLev++;
+			var index = new GoExpr[N];
+			var colons = new int[N - 1];
+			if( m_tok != GoTokenID.COLON )
+			{
+				index[0] = this.ParseRhs();
+			}
+			var ncolons = 0;
+			while( m_tok == GoTokenID.COLON && ncolons < colons.Length )
+			{
+				colons[ncolons] = m_pos;
+				ncolons++;
+				this.Next();
+				if( m_tok != GoTokenID.COLON && m_tok != GoTokenID.RBRACK && m_tok != GoTokenID.EOF )
+				{
+					index[ncolons] = this.ParseRhs();
+				}
+			}
+			m_exprLev--;
+			var rbrack = this.Expect( GoTokenID.RBRACK );
+
+			if( ncolons > 0 )
+			{
+				var slice3 = false;
+				if( ncolons == 2 )
+				{
+					slice3 = true;
+					if( index[1] == null )
+					{
+						this.Error( colons[0], "2nd index required in 3-index slice" );
+						index[1] = new GoBadExpr { From = colons[0] + 1, To = colons[1] };
+					}
+					if( index[2] == null )
+					{
+						this.Error( colons[1], "3rd index required in 3-index slice" );
+						index[2] = new GoBadExpr { From = colons[1] + 1, To = rbrack };
+					}
+				}
+				return new GoSliceExpr { X = x, Lbrack = lbrack, Low = index[0], High = index[1], Max = index[2], Slice3 = slice3, Rbrack = rbrack };
+			}
+
+			return new GoIndexExpr { X = x, Lbrack = lbrack, Index = index[0], Rbrack = rbrack };
 		}
 
-		private GoExpr ParseSelector( GoExpr goExpr )
+		private GoExpr ParseTypeAssertion( GoExpr x )
 		{
-			throw new NotImplementedException();
+			var lparen = this.Expect( GoTokenID.LPAREN );
+			GoExpr type = null;
+			if( m_tok == GoTokenID.TYPE )
+			{
+				this.Next();
+			}
+			else
+			{
+				type = this.ParseType();
+			}
+			var rparen = this.Expect( GoTokenID.RPAREN );
+
+			return new GoTypeAssertExpr { X = x, Type = type, Lparen = lparen, Rparen = rparen };
+		}
+
+		private GoExpr ParseType()
+		{
+			var type = this.TryType();
+
+			if( type == null )
+			{
+				var pos = m_pos;
+				this.ErrorExpected( pos, "type" );
+				this.Next();
+				return new GoBadExpr { From = pos, To = m_pos };
+			}
+
+			return type;
+		}
+
+		private GoExpr TryType()
+		{
+			var type = this.TryIdentOrType();
+			if( type != null )
+			{
+				this.Resolve( type );
+			}
+			return type;
+		}
+
+		private GoExpr TryIdentOrType()
+		{
+			switch( m_tok )
+			{
+				case GoTokenID.IDENT:
+					return this.ParseTypeName();
+				case GoTokenID.LBRACK:
+					return this.ParseArrayType();
+				case GoTokenID.STRUCT:
+					return this.ParseStructType();
+				case GoTokenID.MUL:
+					return this.ParsePointerType();
+				case GoTokenID.FUNC:
+					{
+						GoScope scope = null;
+						return this.ParseFuncType( out scope );
+					}
+				case GoTokenID.INTERFACE:
+					return this.ParseInterfaceType();
+				case GoTokenID.MAP:
+					return this.ParseMapType();
+				case GoTokenID.CHAN:
+				case GoTokenID.ARROW:
+					return this.ParseChanType();
+				case GoTokenID.LPAREN:
+					{
+						var lparen = m_pos;
+						this.Next();
+						var type = this.ParseType();
+						var rparen = this.Expect( GoTokenID.RPAREN );
+						return new GoParenExpr { Lparen = lparen, X = type, Rparen = rparen };
+					}
+			}
+
+			return null;
+		}
+
+		private GoExpr ParseChanType()
+		{
+			var pos = m_pos;
+			var dir = GoChanDir.Send | GoChanDir.Recv;
+			var arrow = 0;
+			if( m_tok == GoTokenID.CHAN )
+			{
+				this.Next();
+				if( m_tok == GoTokenID.ARROW )
+				{
+					arrow = m_pos;
+					this.Next();
+					dir = GoChanDir.Send;
+				}
+			}
+			else
+			{
+				arrow = this.Expect( GoTokenID.ARROW );
+				this.Expect( GoTokenID.CHAN );
+				dir = GoChanDir.Recv;
+			}
+			var value = this.ParseType();
+
+			return new GoChanType { Begin = pos, Arrow = arrow, Dir = dir, Value = value };
+		}
+
+		private GoExpr ParseMapType()
+		{
+			var pos = this.Expect( GoTokenID.MAP );
+			this.Expect( GoTokenID.LBRACK );
+			var key = this.ParseType();
+			this.Expect( GoTokenID.RBRACK );
+			var value = this.ParseType();
+
+			return new GoMapType { Map = pos, Key = key, Value = value };
+		}
+
+		private GoExpr ParseInterfaceType()
+		{
+			var pos = this.Expect( GoTokenID.INTERFACE );
+			var lbrace = this.Expect( GoTokenID.LBRACE );
+			var scope = new GoScope( null );
+			var list = new List<GoField>();
+			while( m_tok == GoTokenID.IDENT )
+			{
+				list.Add( this.ParseMethodSpec( scope ) );
+			}
+			var rbrace = this.Expect( GoTokenID.RBRACE );
+
+			var methods = new GoFieldList { Opening = lbrace, List = list, Closing = rbrace };
+			return new GoInterfaceType { Interface = pos, Methods = methods };
+		}
+
+		private GoField ParseMethodSpec( GoScope scope )
+		{
+			var doc = m_leadComment;
+			var idents = new List<GoIdent>();
+			GoExpr type = null;
+			var x = this.ParseTypeName();
+			if( x is GoIdent && m_tok == GoTokenID.LPAREN )
+			{
+				var ident = x as GoIdent;
+				idents.Add( ident );
+				var s = new GoScope( null );
+				GoFieldList parameters = null, results = null;
+				this.ParseSignature( out parameters, out results, s );
+				type = new GoFuncType { Func = 0, Params = parameters, Results = results };
+			}
+			else
+			{
+				type = x;
+				this.Resolve( type );
+			}
+			this.ExpectSemi();
+
+			var spec = new GoField { Doc = doc, Names = idents, Type = type, Comment = m_lineComment };
+			this.Declare( spec, null, scope, GoObjectKind.Fun, idents.ToArray() );
+
+			return spec;
+		}
+
+		private GoFuncType ParseFuncType( out GoScope scope )
+		{
+			var pos = this.Expect( GoTokenID.FUNC );
+			scope = new GoScope( m_topScope );
+			GoFieldList parameters = null, results = null;
+			this.ParseSignature( out parameters, out results, scope );
+
+			return new GoFuncType { Func = pos, Params = parameters, Results = results };
+		}
+
+		private GoStarExpr ParsePointerType()
+		{
+			var star = this.Expect( GoTokenID.MUL );
+			var b = this.ParseType();
+
+			return new GoStarExpr { Star = star, X = b };
+		}
+
+		private GoStructType ParseStructType()
+		{
+			var pos = this.Expect( GoTokenID.STRUCT );
+			var lbrace = this.Expect( GoTokenID.LBRACE );
+			var scope = new GoScope( null );
+			var list = new List<GoField>();
+			while( m_tok == GoTokenID.IDENT || m_tok == GoTokenID.MUL || m_tok == GoTokenID.LPAREN )
+			{
+				list.Add( this.ParseFieldDecl( scope ) );
+			}
+			var rbrace = this.Expect( GoTokenID.RBRACE );
+
+			var fields = new GoFieldList { Opening = lbrace, List = list, Closing = rbrace };
+			return new GoStructType { Struct = pos, Fields = fields };
+		}
+
+		private GoField ParseFieldDecl( GoScope scope )
+		{
+			var doc = m_leadComment;
+
+			List<GoExpr> list = null;
+			GoExpr type = null;
+			this.ParseVarList( out list, out type, false );
+
+			GoBasicLit tag = null;
+			if( m_tok == GoTokenID.STRING )
+			{
+				tag = new GoBasicLit { ValuePos = m_pos, Kind = m_tok, Value = m_lit };
+				this.Next();
+			}
+
+			var idents = new List<GoIdent>();
+			if( type != null )
+			{
+				idents = this.MakeIdentList( list );
+			}
+			else
+			{
+				type = list[0];
+				if( list.Count > 1 || IsTypeName( Deref( type ) ) == false )
+				{
+					var pos = type.Pos;
+					this.ErrorExpected( pos, "anonymous field" );
+					type = new GoBadExpr { From = pos, To = this.SafePos( list.Last().End ) };
+				}
+			}
+
+			this.ExpectSemi();
+
+			var field = new GoField { Doc = doc, Names = idents, Type = type, Tag = tag, Comment = m_lineComment };
+			this.Declare( field, null, scope, GoObjectKind.Var, idents.ToArray() );
+			this.Resolve( type );
+
+			return field;
+		}
+
+		private static GoExpr Deref( GoExpr x )
+		{
+			if( x is GoStarExpr )
+			{
+				var p = x as GoStarExpr;
+				x = p.X;
+			}
+			return x;
+		}
+
+		private List<GoIdent> MakeIdentList( List<GoExpr> list )
+		{
+			var idents = new List<GoIdent>();
+			foreach( var x in list )
+			{
+				var ident = x as GoIdent;
+				if( x is GoIdent == false )
+				{
+					if( x is GoBadExpr == false )
+					{
+						this.ErrorExpected( x.Pos, "identifier" );
+					}
+					ident = new GoIdent { NamePos = x.Pos, Name = "_" };
+				}
+				idents.Add( ident );
+			}
+			return idents;
+		}
+
+		private void ParseVarList( out List<GoExpr> list, out GoExpr type, bool isParam )
+		{
+			list = new List<GoExpr>();
+			type = this.ParseVarType( isParam );
+			while( type != null )
+			{
+				list.Add( type );
+				if( m_tok != GoTokenID.COMMA )
+				{
+					break;
+				}
+				this.Next();
+				type = this.TryVarType( isParam );
+			}
+
+			type = this.TryVarType( isParam );
+		}
+
+		private GoExpr TryVarType( bool isParam )
+		{
+			if( isParam && m_tok == GoTokenID.ELLIPSIS )
+			{
+				var pos = m_pos;
+				this.Next();
+				var type = this.TryIdentOrType();
+				if( type != null )
+				{
+					this.Resolve( type );
+				}
+				else
+				{
+					this.Error( pos, "'...' parameter is missing type" );
+					type = new GoBadExpr { From = pos, To = m_pos };
+				}
+				return new GoEllipsis { Ellipsis = pos, Elt = type };
+			}
+			return this.TryIdentOrType();
+		}
+
+		private GoExpr ParseVarType( bool isParam )
+		{
+			var type = this.TryVarType( isParam );
+			if( type == null )
+			{
+				var pos = m_pos;
+				this.ErrorExpected( pos, "type" );
+				this.Next();
+				type = new GoBadExpr { From = pos, To = m_pos };
+			}
+			return type;
+		}
+
+		private GoExpr ParseArrayType()
+		{
+			var lbrack = this.Expect( GoTokenID.LBRACK );
+			GoExpr len = null;
+			if( m_tok == GoTokenID.ELLIPSIS )
+			{
+				len = new GoEllipsis { Ellipsis = m_pos };
+				this.Next();
+			}
+			else if( m_tok != GoTokenID.RBRACK )
+			{
+				len = this.ParseRhs();
+			}
+			this.Expect( GoTokenID.RBRACK );
+			var elt = this.ParseType();
+
+			return new GoArrayType { Lbrack = lbrack, Len = len, Elt = elt };
+		}
+
+		private GoExpr ParseTypeName()
+		{
+			var ident = this.ParseIdent();
+
+			if( m_tok == GoTokenID.PERIOD )
+			{
+				this.Next();
+				this.Resolve( ident );
+				var sel = this.ParseIdent();
+				return new GoSelectorExpr { X = ident, Sel = sel };
+			}
+
+			return ident;
+		}
+
+		private GoExpr ParseSelector( GoExpr x )
+		{
+			var sel = this.ParseIdent();
+
+			return new GoSelectorExpr { X = x, Sel = sel };
 		}
 
 		private GoExpr ParseOperand( bool lhs )
 		{
-			throw new NotImplementedException();
+			switch( m_tok )
+			{
+				case GoTokenID.IDENT:
+					{
+						var x = this.ParseIdent();
+						if( lhs == false )
+						{
+							this.Resolve( x );
+						}
+						return x;
+					}
+				case GoTokenID.INT:
+				case GoTokenID.FLOAT:
+				case GoTokenID.IMAG:
+				case GoTokenID.CHAR:
+				case GoTokenID.STRING:
+					{
+						var x = new GoBasicLit { ValuePos = m_pos, Kind = m_tok, Value = m_lit };
+						this.Next();
+						return x;
+					}
+				case GoTokenID.LPAREN:
+					{
+						var lparen = m_pos;
+						this.Next();
+						m_exprLev++;
+						var x = this.ParseRhsOrType();
+						m_exprLev--;
+						var rparen = this.Expect( GoTokenID.RPAREN );
+						return new GoParenExpr { Lparen = lparen, X = x, Rparen = rparen };
+					}
+				case GoTokenID.FUNC:
+					return this.ParseFuncTypeOrLit();
+			}
+
+			var type = this.TryIdentOrType();
+			if( type != null )
+			{
+				var isIdent = type is GoIdent;
+				this.Assert( isIdent == false, "Type cannot be identifier" );
+				return type;
+			}
+
+			var pos = m_pos;
+			this.ErrorExpected( pos, "operand" );
+			SyncStmt( this );
+			return new GoBadExpr { From = pos, To = m_pos };
+		}
+
+		private GoExpr ParseFuncTypeOrLit()
+		{
+			GoScope scope = null;
+			var type = this.ParseFuncType( out scope );
+			if( m_tok != GoTokenID.LBRACE )
+			{
+				return type;
+			}
+
+			m_exprLev++;
+			var body = this.ParseBody( scope );
+			m_exprLev--;
+
+			return new GoFuncLit { Type = type, Body = body };
 		}
 
 		private GoExpr CheckExprOrType( GoExpr x )
 		{
-			throw new NotImplementedException();
+			var unparened = Unparen( x );
+			if( unparened is GoParenExpr )
+			{
+				throw new Exception( "Unreachable" );
+			}
+			else if( unparened is GoUnaryExpr )
+			{
+			}
+			else if( unparened is GoArrayType )
+			{
+				var t = unparened as GoArrayType;
+				if( t.Len is GoEllipsis )
+				{
+					var len = t.Len as GoEllipsis;
+					this.Error( len.Pos, "Expected array length, found '...'" );
+					x = new GoBadExpr { From = x.Pos, To = this.SafePos( x.End ) };
+				}
+			}
+
+			return x;
 		}
 
 		private List<GoExpr> ParseLhsList()
 		{
-			throw new NotImplementedException();
+			var old = m_inRhs;
+			m_inRhs = false;
+			var list = this.ParseExprList( true );
+			switch( m_tok )
+			{
+				case GoTokenID.DEFINE:
+					break;
+				case GoTokenID.COLON:
+					break;
+				default:
+					foreach( var x in list )
+					{
+						this.Resolve( x );
+					}
+					break;
+			}
+			m_inRhs = old;
+			return list;
+		}
+
+		private List<GoExpr> ParseExprList( bool lhs )
+		{
+			var list = new List<GoExpr>();
+
+			list.Add( this.CheckExpr( this.ParseExpr( lhs ) ) );
+			while( m_tok == GoTokenID.COMMA )
+			{
+				this.Next();
+				list.Add( this.CheckExpr( this.ParseExpr( lhs ) ) );
+			}
+
+			return list;
 		}
 
 		private GoStmt ParseSwitchStmt()
 		{
-			throw new NotImplementedException();
+			bool shouldCloseInnerScope = false;
+
+			var pos = this.Expect( GoTokenID.SWITCH );
+			this.OpenScope();
+
+			GoStmt s1 = null, s2 = null;
+			if( m_tok != GoTokenID.LBRACE )
+			{
+				var prevLev = m_exprLev;
+				m_exprLev = -1;
+				if( m_tok != GoTokenID.SEMICOLON )
+				{
+					this.ParseSimpleStmt( out s2, SimpleStmtParseMode.Basic );
+				}
+				if( m_tok == GoTokenID.SEMICOLON )
+				{
+					this.Next();
+					s1 = s2;
+					s2 = null;
+					if( m_tok != GoTokenID.LBRACE )
+					{
+						this.OpenScope();
+						shouldCloseInnerScope = true;
+						this.ParseSimpleStmt( out s2, SimpleStmtParseMode.Basic );
+					}
+				}
+				m_exprLev = prevLev;
+			}
+
+			var typeSwitch = IsTypeSwitchGuard( s2 );
+			var lbrace = this.Expect( GoTokenID.LBRACE );
+			var list = new List<GoStmt>();
+			while( m_tok == GoTokenID.CASE || m_tok == GoTokenID.DEFAULT )
+			{
+				list.Add( this.ParseCaseClause( typeSwitch ) );
+			}
+			var rbrace = this.Expect( GoTokenID.RBRACE );
+			this.ExpectSemi();
+			var body = new GoBlockStmt { Lbrace = lbrace, List = list, Rbrace = rbrace };
+
+			if( typeSwitch )
+			{
+				if( shouldCloseInnerScope )
+				{
+					this.CloseScope();
+				}
+				this.CloseScope();
+				return new GoTypeSwitchStmt { Switch = pos, Init = s1, Assign = s2, Body = body };
+			}
+
+			if( shouldCloseInnerScope )
+			{
+				this.CloseScope();
+			}
+			this.CloseScope();
+			return new GoSwitchStmt { Switch = pos, Init = s1, Tag = this.MakeExpr( s2, "switch expression" ), Body = body };
+		}
+
+		private GoStmt ParseCaseClause( bool typeSwitch )
+		{
+			var pos = m_pos;
+			var list = new List<GoExpr>();
+			if( m_tok == GoTokenID.CASE )
+			{
+				this.Next();
+				if( typeSwitch )
+				{
+					list = this.ParseTypeList();
+				}
+				else
+				{
+					list = this.ParseRhsList();
+				}
+			}
+			else
+			{
+				this.Expect( GoTokenID.DEFAULT );
+			}
+
+			var colon = this.Expect( GoTokenID.COLON );
+			this.OpenScope();
+			var body = this.ParseStmtList();
+			this.CloseScope();
+
+			return new GoCaseClause { Case = pos, List = list, Colon = colon, Body = body };
+		}
+
+		private List<GoExpr> ParseRhsList()
+		{
+			var old = m_inRhs;
+			m_inRhs = true;
+			var list = this.ParseExprList( false );
+			m_inRhs = old;
+			return list;
+		}
+
+		private List<GoExpr> ParseTypeList()
+		{
+			var list = new List<GoExpr>();
+
+			list.Add( this.ParseType() );
+			while( m_tok == GoTokenID.COMMA )
+			{
+				this.Next();
+				list.Add( this.ParseType() );
+			}
+
+			return list;
+		}
+
+		private static bool IsTypeSwitchGuard( GoStmt s )
+		{
+			if( s is GoExprStmt )
+			{
+				var t = s as GoExprStmt;
+				return IsTypeSwitchAssert( t.X );
+			}
+			else if( s is GoAssignStmt )
+			{
+				var t = s as GoAssignStmt;
+				return t.Lhs.Count == 1 && t.Tok == GoTokenID.DEFINE && t.Rhs.Count == 1 && IsTypeSwitchAssert( t.Rhs[0] );
+			}
+			return false;
+		}
+
+		private static bool IsTypeSwitchAssert( GoExpr x )
+		{
+			bool ok = x is GoTypeAssertExpr;
+			var a = x as GoTypeAssertExpr;
+			return ok && a.Type == null;
 		}
 
 		private GoStmt ParseIfStmt()
 		{
-			throw new NotImplementedException();
+			var pos = this.Expect( GoTokenID.IF );
+			this.OpenScope();
+
+			GoStmt s = null;
+			GoExpr x = null;
+
+			var prevLev = m_exprLev;
+			m_exprLev = -1;
+			if( m_tok == GoTokenID.SEMICOLON )
+			{
+				this.Next();
+				x = this.ParseRhs();
+			}
+			else
+			{
+				this.ParseSimpleStmt( out s, SimpleStmtParseMode.Basic );
+				if( m_tok == GoTokenID.SEMICOLON )
+				{
+					this.Next();
+					x = this.ParseRhs();
+				}
+				else
+				{
+					x = this.MakeExpr( s, "boolean expression" );
+					s = null;
+				}
+			}
+			m_exprLev = prevLev;
+
+			var body = this.ParseBlockStmt();
+			GoStmt else_ = null;
+			if( m_tok == GoTokenID.ELSE )
+			{
+				this.Next();
+				else_ = this.ParseStmt();
+			}
+			else
+			{
+				this.ExpectSemi();
+			}
+
+			this.CloseScope();
+			return new GoIfStmt { If = pos, Init = s, Cond = x, Body = body, Else = else_ };
 		}
 
 		private GoBlockStmt ParseBlockStmt()
 		{
-			throw new NotImplementedException();
+			var lbrace = this.Expect( GoTokenID.LBRACE );
+			this.OpenScope();
+			var list = this.ParseStmtList();
+			this.CloseScope();
+			var rbrace = this.Expect( GoTokenID.RBRACE );
+
+			return new GoBlockStmt { Lbrace = lbrace, List = list, Rbrace = rbrace };
 		}
 
 		private GoStmt ParseBranchStmt( GoTokenID tok )
 		{
-			throw new NotImplementedException();
+			var pos = this.Expect( tok );
+			GoIdent label = null;
+			if( tok != GoTokenID.FALLTHROUGH && m_tok == GoTokenID.IDENT )
+			{
+				label = this.ParseIdent();
+				m_targetStack.Last().Add( label );
+			}
+			this.ExpectSemi();
+
+			return new GoBranchStmt { TokPos = pos, Tok = tok, Label = label };
 		}
 
 		private GoStmt ParseReturnStmt()
 		{
-			throw new NotImplementedException();
+			var pos = m_pos;
+			this.Expect( GoTokenID.RETURN );
+			var x = new List<GoExpr>();
+			if( m_tok != GoTokenID.SEMICOLON && m_tok != GoTokenID.RBRACE )
+			{
+				x = this.ParseRhsList();
+			}
+			this.ExpectSemi();
+
+			return new GoReturnStmt { Return = pos, Results = x };
 		}
 
 		private GoStmt ParseDeferStmt()
 		{
-			throw new NotImplementedException();
+			var pos = this.Expect( GoTokenID.DEFER );
+			var call = this.ParseCallExpr( "defer" );
+			this.ExpectSemi();
+			if( call == null )
+			{
+				return new GoBadStmt { From = pos, To = pos + 5 };
+			}
+
+			return new GoDeferStmt { Defer = pos, Call = call };
+		}
+
+		private GoCallExpr ParseCallExpr( string callType )
+		{
+			var x = this.ParseRhsOrType();
+			if( x is GoCallExpr )
+			{
+				return x as GoCallExpr;
+			}
+			if( x is GoBadExpr == false )
+			{
+				this.Error( this.SafePos( x.End ), "Function must be invoked in " + callType + " statement" );
+			}
+			return null;
 		}
 
 		private GoStmt ParseGoStmt()
 		{
-			throw new NotImplementedException();
+			var pos = this.Expect( GoTokenID.GO );
+			var call = this.ParseCallExpr( "go" );
+			this.ExpectSemi();
+			if( call == null )
+			{
+				return new GoBadStmt { From = pos, To = pos + 2 };
+			}
+
+			return new GoGoStmt { Go = pos, Call = call };
 		}
 
-		private bool ParseSimpleStmt( out GoStmt s, SimpleStmtParseMode simpleStmtParseMode )
+		private bool ParseSimpleStmt( out GoStmt s, SimpleStmtParseMode mode )
 		{
-			throw new NotImplementedException();
+			var x = this.ParseLhsList();
+
+			switch( m_tok )
+			{
+				case GoTokenID.DEFINE:
+				case GoTokenID.ASSIGN:
+				case GoTokenID.ADD_ASSIGN:
+				case GoTokenID.SUB_ASSIGN:
+				case GoTokenID.MUL_ASSIGN:
+				case GoTokenID.QUO_ASSIGN:
+				case GoTokenID.REM_ASSIGN:
+				case GoTokenID.AND_ASSIGN:
+				case GoTokenID.OR_ASSIGN:
+				case GoTokenID.XOR_ASSIGN:
+				case GoTokenID.SHL_ASSIGN:
+				case GoTokenID.SHR_ASSIGN:
+				case GoTokenID.AND_NOT_ASSIGN:
+					{
+						var pos = m_pos;
+						var tok = m_tok;
+						this.Next();
+						var y = new List<GoExpr>();
+						var isRange = false;
+						if( mode == SimpleStmtParseMode.RangeOk && m_tok == GoTokenID.RANGE && ( tok == GoTokenID.DEFINE || tok == GoTokenID.ASSIGN ) )
+						{
+							var p = m_pos;
+							this.Next();
+							y.Add( new GoUnaryExpr { OpPos = p, Op = GoTokenID.RANGE, X = this.ParseRhs() } );
+							isRange = true;
+						}
+						else
+						{
+							y = this.ParseRhsList();
+						}
+						var assign = new GoAssignStmt { Lhs = x, TokPos = pos, Tok = tok, Rhs = y };
+						if( tok == GoTokenID.DEFINE )
+						{
+							this.ShortVarDecl( assign, x );
+						}
+						s = assign;
+						return isRange;
+					}
+			}
+
+			if( x.Count > 1 )
+			{
+				this.ErrorExpected( x[0].Pos, "1 expression" );
+			}
+
+			switch( m_tok )
+			{
+				case GoTokenID.COLON:
+					{
+						var colon = m_pos;
+						this.Next();
+						if( mode == SimpleStmtParseMode.LabelOk && x[0] is GoIdent )
+						{
+							var label = x[0] as GoIdent;
+							var stmt = new GoLabeledStmt { Label = label, Colon = colon, Stmt = this.ParseStmt() };
+							this.Declare( stmt, null, m_labelScope, GoObjectKind.Lbl, label );
+							s = stmt;
+							return false;
+						}
+						this.Error( colon, "Illegal label declaration" );
+						s = new GoBadStmt { From = x[0].Pos, To = colon + 1 };
+						return false;
+					}
+				case GoTokenID.ARROW:
+					{
+						var arrow = m_pos;
+						this.Next();
+						var y = this.ParseRhs();
+						s = new GoSendStmt { Chan = x[0], Arrow = arrow, Value = y };
+						return false;
+					}
+				case GoTokenID.INC:
+				case GoTokenID.DEC:
+					{
+						s = new GoIncDecStmt { X = x[0], TokPos = m_pos, Tok = m_tok };
+						this.Next();
+						return false;
+					}
+			}
+
+			s = new GoExprStmt { X = x[0] };
+			return false;
 		}
 
 		private void OpenLabelScope()
 		{
-			throw new NotImplementedException();
+			m_labelScope = new GoScope( m_labelScope );
+			m_targetStack.Add( null );
 		}
 
 		private void ParseSignature( out GoFieldList parameters, out GoFieldList results, GoScope scope )
 		{
-			throw new NotImplementedException();
+			parameters = this.ParseParameters( scope, true );
+			results = this.ParseResult( scope );
+		}
+
+		private GoFieldList ParseResult( GoScope scope )
+		{
+			if( m_tok == GoTokenID.LPAREN )
+			{
+				return this.ParseParameters( scope, false );
+			}
+
+			var type = this.TryType();
+			if( type != null )
+			{
+				var list = new List<GoField>();
+				list.Add( new GoField { Type = type } );
+				return new GoFieldList { List = list };
+			}
+
+			return null;
+		}
+
+		private GoFieldList ParseParameters( GoScope scope, bool ellipsisOk )
+		{
+			var parameters = new List<GoField>();
+			var lparen = this.Expect( GoTokenID.LPAREN );
+			if( m_tok != GoTokenID.RPAREN )
+			{
+				parameters = this.ParseParameterList( scope, ellipsisOk );
+			}
+			var rparen = this.Expect( GoTokenID.RPAREN );
+
+			return new GoFieldList { Opening = lparen, List = parameters, Closing = rparen };
+		}
+
+		private List<GoField> ParseParameterList( GoScope scope, bool ellipsisOk )
+		{
+			var parameters = new List<GoField>();
+
+			List<GoExpr> list = null;
+			GoExpr type = null;
+			this.ParseVarList( out list, out type, ellipsisOk );
+
+			if( type != null )
+			{
+				var idents = this.MakeIdentList( list );
+				var field = new GoField { Names = idents, Type = type };
+				parameters.Add( field );
+
+				this.Declare( field, null, scope, GoObjectKind.Var, idents.ToArray() );
+				this.Resolve( type );
+				if( m_tok == GoTokenID.COMMA )
+				{
+					this.Next();
+				}
+				while( m_tok != GoTokenID.RPAREN && m_tok != GoTokenID.EOF )
+				{
+					var ids = this.ParseIdentList();
+					var t = this.ParseVarType( ellipsisOk );
+					var f = new GoField { Names = ids, Type = t };
+					parameters.Add( f );
+
+					this.Declare( f, null, scope, GoObjectKind.Var, ids.ToArray() );
+					this.Resolve( t );
+					if( this.AtComma( "parameter list" ) == false )
+					{
+						break;
+					}
+					this.Next();
+				}
+			}
+			else
+			{
+				foreach( var t in list )
+				{
+					this.Resolve( t );
+					parameters.Add( new GoField { Type = t } );
+				}
+			}
+
+			return parameters;
+		}
+
+		private List<GoIdent> ParseIdentList()
+		{
+			var list = new List<GoIdent>();
+
+			list.Add( this.ParseIdent() );
+			while( m_tok == GoTokenID.COMMA )
+			{
+				this.Next();
+				list.Add( this.ParseIdent() );
+			}
+
+			return list;
 		}
 
 		private GoFieldList ParseReceiver( GoScope scope )
 		{
-			throw new NotImplementedException();
+			var par = this.ParseParameters( scope, false );
+
+			if( par.NumFields != 1 )
+			{
+				this.ErrorExpected( par.Opening, "exactly one receiver" );
+				par.List.Clear();
+				par.List.Add( new GoField { Type = new GoBadExpr { From = par.Opening, To = par.Closing + 1 } } );
+				return par;
+			}
+
+			var recv = par.List[0];
+			var b = Deref( recv.Type );
+			if( b is GoIdent == false )
+			{
+				if( b is GoBadExpr == false )
+				{
+					this.ErrorExpected( b.Pos, "(unqualified) identifier" );
+				}
+				par.List.Clear();
+				par.List.Add( new GoField { Type = new GoBadExpr { From = recv.Pos, To = this.SafePos( recv.End ) } } );
+			}
+
+			return par;
 		}
 
 		private GoSpec ParseTypeSpec( GoCommentGroup doc, GoTokenID keyword, int iota )
 		{
-			throw new NotImplementedException();
+			var ident = this.ParseIdent();
+
+			var spec = new GoTypeSpec { Doc = doc, Name = ident };
+			this.Declare( spec, null, m_topScope, GoObjectKind.Typ, ident );
+
+			spec.Type = this.ParseType();
+			this.ExpectSemi();
+			spec.Comment = m_lineComment;
+
+			return spec;
 		}
 
 		private GoSpec ParseValueSpec( GoCommentGroup doc, GoTokenID keyword, int iota )
 		{
-			throw new NotImplementedException();
+			var idents = this.ParseIdentList();
+			var type = this.TryType();
+			var values = new List<GoExpr>();
+
+			if( m_tok == GoTokenID.ASSIGN )
+			{
+				this.Next();
+				values = this.ParseRhsList();
+			}
+			this.ExpectSemi();
+
+			var spec = new GoValueSpec { Doc = doc, Names = idents, Type = type, Values = values, Comment = m_lineComment };
+			var kind = GoObjectKind.Con;
+			if( keyword == GoTokenID.VAR )
+			{
+				kind = GoObjectKind.Var;
+			}
+			this.Declare( spec, iota, m_topScope, kind, idents.ToArray() );
+
+			return spec;
 		}
 
 		private GoSpec ParseImportSpec( GoCommentGroup doc, GoTokenID keyword, int iota )
 		{
-			throw new NotImplementedException();
+			GoIdent ident = null;
+			switch( m_tok )
+			{
+				case GoTokenID.PERIOD:
+					ident = new GoIdent { NamePos = m_pos, Name = "." };
+					this.Next();
+					break;
+				case GoTokenID.IDENT:
+					ident = this.ParseIdent();
+					break;
+			}
+
+			var pos = m_pos;
+			var path = "";
+			if( m_tok == GoTokenID.STRING )
+			{
+				path = m_lit;
+				if( IsValidImport( path ) == false )
+				{
+					this.Error( pos, "Invalid import path: " + path );
+				}
+				this.Next();
+			}
+			else
+			{
+				this.Expect( GoTokenID.STRING );
+			}
+			this.ExpectSemi();
+
+			var spec = new GoImportSpec { Doc = doc, Name = ident, Path = new GoBasicLit { ValuePos = pos, Kind = GoTokenID.STRING, Value = path }, Comment = m_lineComment };
+			m_imports.Add( spec );
+
+			return spec;
+		}
+
+		private static bool IsValidImport( string lit )
+		{
+			var illegalChars = @"!#$%&'()*,:;<=>?[\]^{|}" + "\"`\uFFFD";
+			var s = Unquote( lit );
+			foreach( var r in s )
+			{
+				if( char.IsSymbol( r ) == false || char.IsWhiteSpace( r ) || illegalChars.Contains( r ) )
+				{
+					return false;
+				}
+			}
+			return s != "";
+		}
+
+		private static string Unquote( string str )
+		{
+			return str.Trim( '"', '\'', '`' );
 		}
 
 		private GoGenDecl ParseGenDecl( GoTokenID keyword, ParseSpecFunction f )
 		{
-			throw new NotImplementedException();
+			var doc = m_leadComment;
+			var pos = this.Expect( keyword );
+			int lparen = 0, rparen = 0;
+			var list = new List<GoSpec>();
+			if( m_tok == GoTokenID.LPAREN )
+			{
+				lparen = m_pos;
+				this.Next();
+				for( var iota = 0; m_tok != GoTokenID.RPAREN && m_tok != GoTokenID.EOF; iota++ )
+				{
+					list.Add( f( m_leadComment, keyword, iota ) );
+				}
+				rparen = this.Expect( GoTokenID.RPAREN );
+				this.ExpectSemi();
+			}
+			else
+			{
+				list.Add( f( null, keyword, 0 ) );
+			}
+
+			return new GoGenDecl { Doc = doc, TokPos = pos, Tok = keyword, Lparen = lparen, Specs = list, Rparen = rparen };
 		}
 
 		private void ExpectSemi()
 		{
-			throw new NotImplementedException();
+			if( m_tok != GoTokenID.RPAREN && m_tok != GoTokenID.RBRACE )
+			{
+				if( m_tok == GoTokenID.SEMICOLON )
+				{
+					this.Next();
+				}
+				else
+				{
+					this.ErrorExpected( m_pos, "';'" );
+					SyncStmt( this );
+				}
+			}
 		}
 
 		private GoIdent ParseIdent()
 		{
-			throw new NotImplementedException();
+			var pos = m_pos;
+			var name = "_";
+			if( m_tok == GoTokenID.IDENT )
+			{
+				name = m_lit;
+				this.Next();
+			}
+			else
+			{
+				this.Expect( GoTokenID.IDENT );
+			}
+			return new GoIdent { NamePos = pos, Name = name };
 		}
 
-		private int Expect( GoTokenID goTokenID )
+		private int Expect( GoTokenID tok )
 		{
-			throw new NotImplementedException();
+			var pos = m_pos;
+			if( m_tok != tok )
+			{
+				this.ErrorExpected( pos, "'" + GoToken.ToString( tok ) + "'" );
+			}
+			this.Next();
+			return pos;
 		}
 
 		private void Next()
@@ -1226,21 +2344,6 @@ namespace Fitbos.GoLanguageService
 
 		private void Next0()
 		{
-			// Skip trace for now
-			/*
-			if p.trace && p.pos.IsValid() {
-				s := p.tok.String()
-				switch {
-				case p.tok.IsLiteral():
-					p.printTrace(s, p.lit)
-				case p.tok.IsOperator(), p.tok.IsKeyword():
-					p.printTrace("\"" + s + "\"")
-				default:
-					p.printTrace(s)
-				}
-			}
-			*/
-
 			int state = 0;
 			var token = m_lexer.GetToken( ref state );
 			m_pos = token.Position;
