@@ -2,6 +2,8 @@
 using Microsoft.VisualStudio.TextManager.Interop;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,6 +19,50 @@ namespace Fitbos.GoLanguageService
 		private GoColorizer m_colorizer;
 
 		private GoSource m_source;
+
+		public GoLanguageService()
+		{
+			//this.ParseStandardLibrary();
+		}
+
+		private void ParseStandardLibrary()
+		{
+			this.ParseDir( @"D:\DEVELOP\Go\src\pkg" );
+		}
+
+		private void ParseDir( string path )
+		{
+			var dir = new DirectoryInfo( path );
+			foreach( var subDir in dir.GetDirectories() )
+			{
+				this.ParseDir( subDir.FullName );
+			}
+
+			foreach( var file in dir.GetFiles( "*.go" ) )
+			{
+				this.ParseFile( file.FullName );
+			}
+		}
+
+		private void ParseFile( string path )
+		{
+			var fileSet = new GoSourceFileSet();
+			var parser = new GoParser( fileSet, path, File.ReadAllText( path ) );
+			parser.ParseFile();
+
+			if( parser.Errors.Count == 0 )
+			{
+				Debug.WriteLine( path );
+			}
+			else
+			{
+				foreach( var error in parser.Errors )
+				{
+					error.Pos = parser.File.Position( error.Pos.Offset );
+				}
+				throw new Exception();
+			}
+		}
 
 		public override string GetFormatFilterList()
 		{
@@ -70,17 +116,6 @@ namespace Fitbos.GoLanguageService
 
 				var task = m_source.CreateErrorTaskItem( ts, MARKERTYPE.MARKER_COMPILE_ERROR, req.FileName );
 				task.Text = error.Msg;
-				tasks.Add( task );
-			}
-
-			foreach( var unresolved in file.Unresolved )
-			{
-				var ts = new TextSpan();
-				m_source.GetLineIndexOfPosition( unresolved.Pos - 1, out ts.iStartLine, out ts.iStartIndex );
-				m_source.GetLineIndexOfPosition( unresolved.End - 1, out ts.iEndLine, out ts.iEndIndex );
-
-				var task = m_source.CreateErrorTaskItem( ts, MARKERTYPE.MARKER_IDENTERROR, req.FileName );
-				task.Text = "Unresolved: " + unresolved.Name;
 				tasks.Add( task );
 			}
 

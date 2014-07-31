@@ -111,7 +111,7 @@ namespace Fitbos.GoLanguageService
 					token.ID = GoTokenID.IDENT;
 				}
 			}
-			else if( '0' <= ch && ch <= '9' )
+			else if( '0' <= ch && ch <= '9' && m_eof == false )
 			{
 				insertSemicolon = true;
 				this.ScanNumber( out token.ID, out token.Text, false );

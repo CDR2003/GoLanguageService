@@ -192,8 +192,23 @@ namespace Fitbos.GoLanguageService
 
 			var info = this.Info( offset );
 			pos.Filename = info.Filename;
+
+			/*
 			pos.Line = info.Line;
 			pos.Column = info.Offset;
+			*/
+
+			for( int line = 0; line < m_lines.Count - 1; line++ )
+			{
+				var curPos = m_lines[line];
+				var nextPos = m_lines[line + 1];
+				if( curPos <= p && p < nextPos )
+				{
+					pos.Line = line;
+					pos.Column = p - curPos;
+					break;
+				}
+			}
 
 			return pos;
 		}

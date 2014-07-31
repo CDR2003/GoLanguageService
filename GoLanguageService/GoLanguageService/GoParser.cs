@@ -17,6 +17,11 @@ namespace Fitbos.GoLanguageService
 			}
 		}
 
+		public GoSourceFile File
+		{
+			get { return m_file; }
+		}
+
 		private enum SimpleStmtParseMode
 		{
 			Basic,

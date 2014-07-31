@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Fitbos.GoLanguageService
 {
-	public struct GoError
+	public class GoError
 	{
 		public GoSourcePosition Pos;
 
