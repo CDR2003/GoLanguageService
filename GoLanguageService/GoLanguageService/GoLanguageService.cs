@@ -58,6 +58,32 @@ namespace Fitbos.GoLanguageService
 			var fileSet = new GoSourceFileSet();
 			var parser = new GoParser( fileSet, req.FileName, req.Text );
 			var file = parser.ParseFile();
+
+			var tasks = m_source.GetTaskProvider().Tasks;
+			tasks.Clear();
+			foreach( var error in parser.Errors )
+			{
+				var ts = new TextSpan();
+				m_source.GetLineIndexOfPosition( error.Pos.Offset - 1, out ts.iStartLine, out ts.iStartIndex );
+				ts.iEndLine = ts.iStartLine;
+				ts.iEndIndex = ts.iStartIndex + 1;
+
+				var task = m_source.CreateErrorTaskItem( ts, MARKERTYPE.MARKER_COMPILE_ERROR, req.FileName );
+				task.Text = error.Msg;
+				tasks.Add( task );
+			}
+
+			foreach( var unresolved in file.Unresolved )
+			{
+				var ts = new TextSpan();
+				m_source.GetLineIndexOfPosition( unresolved.Pos - 1, out ts.iStartLine, out ts.iStartIndex );
+				m_source.GetLineIndexOfPosition( unresolved.End - 1, out ts.iEndLine, out ts.iEndIndex );
+
+				var task = m_source.CreateErrorTaskItem( ts, MARKERTYPE.MARKER_IDENTERROR, req.FileName );
+				task.Text = "Unresolved: " + unresolved.Name;
+				tasks.Add( task );
+			}
+
 			return new GoAuthoringScope();
 		}
 

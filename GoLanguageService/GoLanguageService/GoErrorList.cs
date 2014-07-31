@@ -10,6 +10,11 @@ namespace Fitbos.GoLanguageService
 	{
 		private List<GoError> m_errors;
 
+		public List<GoError> Errors
+		{
+			get { return m_errors; }
+		}
+
 		public int Length
 		{
 			get

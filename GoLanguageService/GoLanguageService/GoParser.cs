@@ -9,6 +9,14 @@ namespace Fitbos.GoLanguageService
 {
 	public class GoParser
 	{
+		public List<GoError> Errors
+		{
+			get
+			{
+				return m_errors.Errors;
+			}
+		}
+
 		private enum SimpleStmtParseMode
 		{
 			Basic,
@@ -2194,7 +2202,7 @@ namespace Fitbos.GoLanguageService
 			var s = Unquote( lit );
 			foreach( var r in s )
 			{
-				if( char.IsSymbol( r ) == false || char.IsWhiteSpace( r ) || illegalChars.Contains( r ) )
+				if( ( char.IsLetterOrDigit( r ) == false && char.IsPunctuation( r ) == false ) || char.IsWhiteSpace( r ) || illegalChars.Contains( r ) )
 				{
 					return false;
 				}
